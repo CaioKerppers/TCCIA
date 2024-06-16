@@ -45,7 +45,6 @@ def train_model(pokemon):
         
     model.fit(X, y, epochs=100, verbose=1)
     return model
-  
 
 class Pokemon:
     banned_pokemon = [
@@ -105,9 +104,8 @@ class Pokemon:
         if poke:
             name = poke.name.capitalize()
             types = [t.type.name.capitalize() for t in poke.types] if poke.types else []
-            moveset = [move.move.name.capitalize() for move in poke.moves] if poke.moves else []
-
-            # Estatísticas do Pokémon
+            moveset = [move.move.name.capitalize() for move in poke.moves if pb.move(move.move.name.lower())]  # Verifica se o movimento existe na API
+            
             hp = poke.stats[0].base_stat
             attack = poke.stats[1].base_stat
             defense = poke.stats[2].base_stat
@@ -126,7 +124,7 @@ class Pokemon:
                         types = [row['Type1'].capitalize()]
                         if row['Type2']:
                             types.append(row['Type2'].capitalize())
-                        moveset = [move.capitalize() for move in row['Moveset'].split(',')]
+                        moveset = [move.capitalize() for move in row['Moveset'].split(',') if pb.move(move.lower())]  # Verifica se o movimento existe na API
                         hp = int(row['HP'])
                         attack = int(row['Attack'])
                         defense = int(row['Defense'])
@@ -141,19 +139,22 @@ class Pokemon:
                     
             print(f"Não foi possível obter dados para o Pokémon {pokemon_name}")
             return None
+
  
     def select_move(self, opponent):
         if self.model is None:
             print(f"{self.name} não possui um modelo treinado. Usando seleção aleatória de movimentos.")
-            super().select_move(opponent)
+            self.selected_move = random.choice(self.moveset)  # Corrigido para escolher um movimento válido
+            self.show_move_info(opponent)
             return
-        
+
         state = np.array([list(get_state(self, opponent))])
         q_values = self.model.predict(state)
         move_index = np.argmax(q_values)
         self.selected_move = self.moveset[move_index]
         print(f"{self.name} selecionou o movimento: {self.selected_move}")
         self.show_move_info(opponent)
+
 
     def use_move(self, opponent):
         if self.is_banned():
@@ -195,7 +196,7 @@ class Pokemon:
                 print("Invalid input. Please enter Y or N.")
 
     def get_move_info(self, move_name):
-        move = pb.move(move_name.lower())
+        move = pb.move(move_name.lower().strip())
         if move:
             print(f"Move Name: {move.name.capitalize()}")
             print(f"Power: {move.power}")
@@ -209,12 +210,16 @@ class Pokemon:
                     break
             
             return {
-                "description": effect_text
-                
+                "description": effect_text,
+                "power": move.power,
+                "accuracy": move.accuracy,
+                "category": move.damage_class.name,
+                "type": move.type.name.capitalize()
             }
         else:
             print(f"Couldn't find information for move: {move_name}")
             return None
+
         
     def show_move_info(self, opponent):
         move_name = self.selected_move
@@ -504,14 +509,45 @@ class BattleSimulator:
         elif self.pokemon2.hp <= 0:
             print(f"{self.pokemon1.name} wins!")
 
-# Example usage
-trainer1 = Trainer(BattleRules())
+# Exemplo de uso:
+# Cria o treinador do usuário
+trainer1 = Trainer("Ash")
 trainer1.add_pokemon("pikachu")
-trainer1.switch_active_pokemon(0)
 
-trainer2 = Trainer(BattleRules())
-trainer2.add_pokemon("charmander")
-trainer2.switch_active_pokemon(0)
+# Cria o treinador controlado pela máquina
+trainer2 = Trainer("Gary")
+trainer2.add_pokemon("charizard")
 
-battle_sim = BattleSimulator(trainer1.active_pokemon, trainer2.active_pokemon)
-battle_sim.start_battle()
+# Verifica se ambos os treinadores têm Pokémon em seus times
+if trainer1.team and trainer2.team:
+    # Seleciona o Pokémon do usuário e do oponente
+    user_pokemon = trainer1.team[0]
+    opponent_pokemon = trainer2.team[0]
+    
+    # Treina o modelo do Pokémon controlado pela máquina
+    opponent_pokemon.train_model()
+
+    # Loop de batalha simples para demonstrar a interação
+    while user_pokemon.hp > 0 and opponent_pokemon.hp > 0:
+        # Usuário escolhe um movimento
+        user_move = input(f"Escolha um movimento para {user_pokemon.name} ({', '.join(user_pokemon.moveset)}): ")
+        if user_move in user_pokemon.moveset:
+            user_pokemon.use_move(opponent_pokemon, user_move)
+        else:
+            print("Movimento inválido!")
+
+        # Verifica se o Pokémon do oponente ainda pode lutar
+        if opponent_pokemon.hp <= 0:
+            print(f"{opponent_pokemon.name} foi derrotado!")
+            break
+
+        # Pokémon controlado pela máquina escolhe um movimento
+        opponent_pokemon.select_move(user_pokemon)
+        opponent_pokemon.use_move(user_pokemon)
+        
+        # Verifica se o Pokémon do usuário ainda pode lutar
+        if user_pokemon.hp <= 0:
+            print(f"{user_pokemon.name} foi derrotado!")
+            break
+else:
+    print("Ambos os treinadores precisam ter Pokémon em seus times.")
