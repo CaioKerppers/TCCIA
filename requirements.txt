@@ -1,0 +1,5 @@
+google-cloud-firestore
+tensorflow
+pokebase
+numpy
+firebase-admin
