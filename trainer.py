@@ -17,6 +17,10 @@ class Trainer:
             print("Índice inválido.")
 
     def choose_active_pokemon(self):
+        if not self.pokemon_team:
+            print(f"{self.name} has no available Pokémon.")
+            return False
+
         print(f"{self.name}, escolha seu Pokémon ativo:")
         for idx, pokemon in enumerate(self.pokemon_team):
             print(f"{idx + 1}. {pokemon.name} (HP: {pokemon.hp})")
@@ -27,6 +31,7 @@ class Trainer:
                 break
             else:
                 print("Escolha inválida. Tente novamente.")
+        return True
 
     def select_random_pokemon(self):
         available_pokemons = [pokemon for pokemon in self.pokemon_team if pokemon.hp > 0]
@@ -38,15 +43,22 @@ class Trainer:
 
     def battle_turn(self, opponent_trainer):
         print(f"{self.name}'s turn.")
-        self.active_pokemon.select_move(opponent_trainer.active_pokemon)
+        if self.name == "Gary":
+            self.active_pokemon.select_move_automatically(opponent_trainer.active_pokemon)
+        else:
+            self.active_pokemon.select_move(opponent_trainer.active_pokemon)
 
     def handle_fainted_pokemon(self):
         print(f"{self.active_pokemon.name} fainted!")
+        if not any(pokemon.hp > 0 for pokemon in self.pokemon_team):
+            print(f"{self.name} has no available Pokémon.")
+            return False
+
         while True:
             user_input = input("Do you want to switch Pokémon or forfeit the battle? (switch/forfeit): ").strip().lower()
             if user_input == "switch":
-                self.choose_active_pokemon()
-                break
+                if self.choose_active_pokemon():
+                    break
             elif user_input == "forfeit":
                 print(f"{self.name} has forfeited the battle.")
                 return False

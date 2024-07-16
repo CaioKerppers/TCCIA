@@ -15,7 +15,7 @@ natures = fetch_natures()
 class Pokemon:
     banned_pokemon = banned_pokemon
 
-    def __init__(self, number, name, form, type1, type2, moveset, hp, attack, defense, sp_attack, sp_defense, speed, nature, battle_rules, item=None, level=50, ivs=None, evs=None, *args, **kwargs):
+    def __init__(self, number, name, form, type1, type2, moveset, hp, attack, defense, sp_attack, sp_defense, speed, nature, battle_rules, level=50, ivs=None, evs=None, *args, **kwargs):
         self.number = number
         self.name = name
         self.form = form
@@ -32,7 +32,6 @@ class Pokemon:
         self.moveset = moveset
         self.q_table = {}  # Tabela Q para aprendizado por reforço
         self.selected_move = None
-        self.item = item
         self.model = None
         self.level = level  # Set default level to 50
         self.ivs = ivs if ivs else self.generate_random_ivs()
@@ -44,6 +43,7 @@ class Pokemon:
         self.epsilon_decay = 0.995
         self.learning_rate = 0.001
         self.model = self.build_model(input_dim=6, output_dim=len(moveset))
+        self.status = None  # Adiciona o atributo de status
     
     def build_model(self, input_dim, output_dim):
         model = Sequential()
@@ -71,7 +71,6 @@ class Pokemon:
                 y.append([reward if i == move_index else 0 for i in range(len(self.moveset))])
         X = np.array(X)
         y = np.array(y)
-        # Verificar se a forma dos dados está correta
         print("Shape of X:", X.shape)
         print("Shape of y:", y.shape)
         return X, y
@@ -87,7 +86,6 @@ class Pokemon:
         }
     
     def generate_random_evs(self):
-        # Inicializa todos os EVs com 0
         evs = {
             'hp': 0,
             'attack': 0,
@@ -96,25 +94,18 @@ class Pokemon:
             'sp_defense': 0,
             'speed': 0
         }
-
-        # Escolhe duas estatísticas aleatórias para receber 252 EVs
         stats = list(evs.keys())
         stat1, stat2 = random.sample(stats, 2)
         evs[stat1] = 252
         evs[stat2] = 252
-
-        # Remove as estatísticas que já receberam 252 EVs da lista
         stats.remove(stat1)
         stats.remove(stat2)
-
-        # Distribui os 6 EVs restantes entre as outras estatísticas
         remaining_evs = 6
         while remaining_evs > 0:
             stat = random.choice(stats)
             increment = min(remaining_evs, 4)
             evs[stat] += increment
             remaining_evs -= increment
-
         return evs
 
     def apply_nature_effects(self, stat_name):
@@ -125,7 +116,6 @@ class Pokemon:
         elif nature_decrease == stat_name:
             stat_value *= 0.9
         return int(stat_value)
-
 
     def calculate_stat(self, base, iv, evs, level):
         return ((((2 * base + iv + (evs // 4)) * level) // 100) + 5)
@@ -165,16 +155,10 @@ class Pokemon:
         self.calculate_final_stats()
 
     def check_play_restrictions(self, team):
-        # Check item clause
-        item_count = sum(1 for pokemon in team if pokemon.item == self.item)
-        if item_count > 1:
-            return False
-
         # Check species clause
         species_count = sum(1 for pokemon in team if pokemon.name == self.name)
         if species_count > 1:
             return False
-
         return True
 
     @staticmethod
@@ -194,7 +178,6 @@ class Pokemon:
                 return name, types, moveset, hp, attack, defense, sp_attack, sp_defense, speed
         except Exception as e:
             print(f"Error retrieving Pokémon info from API: {e}")
-            
         print(f"Não foi possível obter dados para o Pokémon {pokemon_name}")
         return None
 
@@ -207,12 +190,19 @@ class Pokemon:
             # Escolha o melhor movimento predito pela rede neural (exploração)
             q_values = self.model.predict(np.array(state).reshape(1, -1))
             move_index = np.argmax(q_values[0])
-
         self.selected_move = self.moveset[move_index]
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
-
         print(f"{self.name} selected move: {self.selected_move}")
+        self.show_move_info(self.selected_move)
+        self.confirm_attack(opponent)
+        
+    def select_move_automatically(self, opponent):
+        state = self.get_state(self, opponent)
+        q_values = self.model.predict(np.array(state).reshape(1, -1))
+        move_index = np.argmax(q_values[0])
+        self.selected_move = self.moveset[move_index]
+        print(f"{self.name} (AI) selected move: {self.selected_move}")
         self.show_move_info(self.selected_move)
         self.confirm_attack(opponent)
 
@@ -226,23 +216,22 @@ class Pokemon:
         if self.selected_move:
             move_info = self.get_move_info(self.selected_move)
             if move_info:
-                move_name, move_type, move_power, move_accuracy, damage_class = move_info
+                move_name, move_type, move_power, move_accuracy, damage_class, status_effects = move_info
                 print(f"{self.name} used {self.selected_move}!")
                 print(f"Move info: Name={move_name}, Type={move_type}, Power={move_power}, Accuracy={move_accuracy}, Class={damage_class}")
-
                 if move_power:  # Verifica se há poder (dano) para o movimento
                     damage = self.calculate_damage(self, opponent, move_info)
                     print(f"Damage calculated: {damage:.2f}")
-                    
                     opponent.hp -= damage
                     if opponent.hp < 0:
                         opponent.hp = 0
                     print(f"{opponent.name}'s HP dropped to {opponent.hp}")
-
-                    # Atualiza a tabela Q com o dano causado
                     self.update_q_table(opponent, damage)
                 else:
                     print("Move has no power (might be a status move).")
+                # Aplicar efeitos de status
+                for status in status_effects:
+                    self.apply_status_effect(opponent, status)
             else:
                 print(f"Could not retrieve move info for {self.selected_move}")
         else:
@@ -253,7 +242,6 @@ class Pokemon:
         level = attacker.level
         move_power = move_info[2] if move_info[2] else 0
         damage_class = move_info[4].lower()
-
         if damage_class == "physical":
             attack_stat = attacker.attack
             defense_stat = defender.defense
@@ -262,40 +250,20 @@ class Pokemon:
             defense_stat = defender.sp_defense
         else:
             return 0  # Caso o movimento não cause dano, retorna 0
-
-        # Fórmula simplificada de cálculo de dano
         damage = (((2 * level / 5 + 2) * move_power * (attack_stat / defense_stat)) / 50) + 2
-
-        # Considera STAB (Same Type Attack Bonus)
         if move_info[1].capitalize() in [attacker.type1, attacker.type2]:
             damage *= 1.5
-
-        # Considera as fraquezas e resistências do oponente
         defender_types = [defender.type1, defender.type2] if defender.type2 else [defender.type1]
         type_effectiveness = Pokemon.get_type_effectiveness(move_info[1].capitalize(), defender_types)
-
         damage *= type_effectiveness
-
         is_critical = random.random() < 0.0625  # Probabilidade de crítico (6.25% por exemplo)
         critical = 1.5 if is_critical else 1.0
         damage *= critical
-        
-        # Considera um fator aleatório entre 85% e 100%
         damage *= random.uniform(0.85, 1.0)
-
         return damage   
 
     def confirm_attack(self, opponent):
-        while True:
-            user_input = input(f"Do you want to use {self.selected_move}? (Y/N): ").strip().lower()
-            if user_input == 'y':
-                self.use_move(opponent)
-                break
-            elif user_input == 'n':
-                self.select_move(opponent)
-                break
-            else:
-                print("Invalid input. Please enter Y or N.")
+        self.use_move(opponent)
 
     def get_move_info(self, move):
         try:
@@ -306,20 +274,40 @@ class Pokemon:
                 move_power = move_data.power if move_data.power else 0
                 move_accuracy = move_data.accuracy if move_data.accuracy else 100
                 damage_class = move_data.damage_class.name.capitalize() if move_data.damage_class else "Status"
-                return move_name, move_type, move_power, move_accuracy, damage_class
+                
+                # Adiciona a lógica para obter os efeitos de status
+                status_effects = []
+                for effect in move_data.effect_entries:
+                    effect_text = effect.effect
+                    if "paralyze" in effect_text:
+                        status_effects.append("paralyze")
+                    elif "burn" in effect_text:
+                        status_effects.append("burn")
+                    elif "freeze" in effect_text:
+                        status_effects.append("freeze")
+                    elif "sleep" in effect_text:
+                        status_effects.append("sleep")
+                    elif "poison" in effect_text:
+                        status_effects.append("poison")
+                    elif "confuse" in effect_text:
+                        status_effects.append("confuse")
+                
+                return move_name, move_type, move_power, move_accuracy, damage_class, status_effects
         except Exception as e:
             print(f"Error retrieving move info: {e}")
-        return None
+        return None, None, None, None, None, []
 
     def show_move_info(self, move):
         move_info = self.get_move_info(move)
         if move_info:
-            move_name, move_type, move_power, move_accuracy, damage_class = move_info
+            move_name, move_type, move_power, move_accuracy, damage_class, status_effects = move_info
             print(f"Move: {move_name}")
             print(f"Type: {move_type}")
             print(f"Power: {move_power}")
             print(f"Accuracy: {move_accuracy}")
             print(f"Class: {damage_class}")
+            if status_effects:
+                print(f"Status Effects: {', '.join(status_effects)}")
         else:
             print(f"Could not retrieve information for move: {move}")
             
@@ -337,7 +325,6 @@ class Pokemon:
         else:
             print("Invalid move selection.")
 
-            
     def get_type_advantage(self, opponent):
         advantage = 1.0
         for opponent_type in [opponent.type1, opponent.type2]:
@@ -347,14 +334,39 @@ class Pokemon:
                     multiplier *= pb.type_damage_multiplier(self.type2, opponent_type)
                 advantage *= multiplier
         return advantage
+    
+    def get_state(self, agent_pokemon, opponent_pokemon):
+        agent_hp = agent_pokemon.hp
+        opponent_hp = opponent_pokemon.hp
+        agent_type1 = agent_pokemon.type1
+        agent_type2 = agent_pokemon.type2
+        opponent_type1 = opponent_pokemon.type1
+        opponent_type2 = opponent_pokemon.type2
+        return (agent_hp, opponent_hp, agent_type1, agent_type2, opponent_type1, opponent_type2)
 
     def update_q_table(self, opponent, damage):
-        # Atualiza a tabela Q com a recompensa baseada no dano causado
         state = tuple(self.get_state(self, opponent))
         reward = damage  # Utiliza o dano causado como recompensa
-
         if state not in self.q_table:
-            self.q_table[state] = np.zeros(len(self.moveset))
+            self.q_table[state] = {move: 0 for move in self.moveset}
+        self.q_table[state][self.selected_move] = (1 - self.learning_rate) * self.q_table[state][self.selected_move] + self.learning_rate * (reward + self.gamma * np.max(list(self.q_table[state].values())))
 
-        move_index = self.moveset.index(self.selected_move)
-        self.q_table[state][move_index] = (1 - self.learning_rate) * self.q_table[state][move_index] + self.learning_rate * (reward + self.gamma * np.max(self.q_table[state]))
+    def apply_status_effect(self, opponent, status):
+        if status == "paralyze":
+            opponent.status = "paralyzed"
+            print(f"{opponent.name} is paralyzed!")
+        elif status == "burn":
+            opponent.status = "burned"
+            print(f"{opponent.name} is burned!")
+        elif status == "freeze":
+            opponent.status = "frozen"
+            print(f"{opponent.name} is frozen!")
+        elif status == "sleep":
+            opponent.status = "asleep"
+            print(f"{opponent.name} fell asleep!")
+        elif status == "poison":
+            opponent.status = "poisoned"
+            print(f"{opponent.name} is poisoned!")
+        elif status == "confuse":
+            opponent.status = "confused"
+            print(f"{opponent.name} is confused!")
