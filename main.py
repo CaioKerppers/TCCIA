@@ -16,31 +16,15 @@ def main():
     # Aplicar regras de batalha
     battle_rules.apply_rules(trainer1, trainer2)
 
-    # Simular algumas batalhas para preencher a tabela Q
-    for _ in range(10):  # Número de batalhas simuladas para preencher a tabela Q
-        trainer1.select_random_pokemon()
-        trainer2.select_random_pokemon()
-        while trainer1.active_pokemon.hp > 0 and trainer2.active_pokemon.hp > 0:
-            trainer1.battle_turn(trainer2)
-            if trainer2.active_pokemon.hp <= 0:
-                if not trainer2.handle_fainted_pokemon():
-                    break
-            if trainer1.active_pokemon.hp <= 0:
-                if not trainer1.handle_fainted_pokemon():
-                    break
-
-    # Treinar modelos de IA
-    for trainer in [trainer1, trainer2]:
-        for pokemon in trainer.pokemon_team:
-            pokemon.train_model()
+    # Treinar modelos para ambos os treinadores
+    for pokemon in trainer1.pokemon_team:
+        pokemon.train_model()
+    for pokemon in trainer2.pokemon_team:
+        pokemon.train_model()
 
     # Selecionar Pokémon ativo
-    if not trainer1.choose_active_pokemon():
-        print(f"{trainer2.name} wins by default!")
-        return
-    if not trainer2.choose_active_pokemon():
-        print(f"{trainer1.name} wins by default!")
-        return
+    trainer1.choose_active_pokemon()
+    trainer2.choose_active_pokemon()
 
     # Simular batalha
     while True:

@@ -1,6 +1,6 @@
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import Dense, Input
 import numpy as np
 import random
 import pokebase as pb
@@ -47,7 +47,8 @@ class Pokemon:
     
     def build_model(self, input_dim, output_dim):
         model = Sequential()
-        model.add(Dense(64, input_dim=input_dim, activation='relu'))
+        model.add(Input(shape=(input_dim,)))
+        model.add(Dense(64, activation='relu'))
         model.add(Dense(64, activation='relu'))
         model.add(Dense(output_dim, activation='linear'))
         model.compile(optimizer='adam', loss='mse')
@@ -155,7 +156,6 @@ class Pokemon:
         self.calculate_final_stats()
 
     def check_play_restrictions(self, team):
-        # Check species clause
         species_count = sum(1 for pokemon in team if pokemon.name == self.name)
         if species_count > 1:
             return False
@@ -184,10 +184,8 @@ class Pokemon:
     def select_move(self, opponent):
         state = self.get_state(self, opponent)
         if np.random.rand() <= self.epsilon:
-            # Escolha um movimento aleatório (exploração)
             move_index = random.randint(0, len(self.moveset) - 1)
         else:
-            # Escolha o melhor movimento predito pela rede neural (exploração)
             q_values = self.model.predict(np.array(state).reshape(1, -1))
             move_index = np.argmax(q_values[0])
         self.selected_move = self.moveset[move_index]
@@ -229,7 +227,6 @@ class Pokemon:
                     self.update_q_table(opponent, damage)
                 else:
                     print("Move has no power (might be a status move).")
-                # Aplicar efeitos de status
                 for status in status_effects:
                     self.apply_status_effect(opponent, status)
             else:
@@ -249,14 +246,14 @@ class Pokemon:
             attack_stat = attacker.sp_attack
             defense_stat = defender.sp_defense
         else:
-            return 0  # Caso o movimento não cause dano, retorna 0
+            return 0
         damage = (((2 * level / 5 + 2) * move_power * (attack_stat / defense_stat)) / 50) + 2
         if move_info[1].capitalize() in [attacker.type1, attacker.type2]:
             damage *= 1.5
         defender_types = [defender.type1, defender.type2] if defender.type2 else [defender.type1]
         type_effectiveness = Pokemon.get_type_effectiveness(move_info[1].capitalize(), defender_types)
         damage *= type_effectiveness
-        is_critical = random.random() < 0.0625  # Probabilidade de crítico (6.25% por exemplo)
+        is_critical = random.random() < 0.0625
         critical = 1.5 if is_critical else 1.0
         damage *= critical
         damage *= random.uniform(0.85, 1.0)
@@ -274,8 +271,6 @@ class Pokemon:
                 move_power = move_data.power if move_data.power else 0
                 move_accuracy = move_data.accuracy if move_data.accuracy else 100
                 damage_class = move_data.damage_class.name.capitalize() if move_data.damage_class else "Status"
-                
-                # Adiciona a lógica para obter os efeitos de status
                 status_effects = []
                 for effect in move_data.effect_entries:
                     effect_text = effect.effect
@@ -291,7 +286,6 @@ class Pokemon:
                         status_effects.append("poison")
                     elif "confuse" in effect_text:
                         status_effects.append("confuse")
-                
                 return move_name, move_type, move_power, move_accuracy, damage_class, status_effects
         except Exception as e:
             print(f"Error retrieving move info: {e}")
@@ -346,7 +340,7 @@ class Pokemon:
 
     def update_q_table(self, opponent, damage):
         state = tuple(self.get_state(self, opponent))
-        reward = damage  # Utiliza o dano causado como recompensa
+        reward = damage
         if state not in self.q_table:
             self.q_table[state] = {move: 0 for move in self.moveset}
         self.q_table[state][self.selected_move] = (1 - self.learning_rate) * self.q_table[state][self.selected_move] + self.learning_rate * (reward + self.gamma * np.max(list(self.q_table[state].values())))
