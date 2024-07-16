@@ -17,20 +17,13 @@ class Trainer:
             print("Índice inválido.")
 
     def choose_active_pokemon(self):
-        if not self.pokemon_team:
-            print(f"{self.name} has no available Pokémon.")
+        available_pokemons = [pokemon for pokemon in self.pokemon_team if pokemon.hp > 0]
+        if available_pokemons:
+            self.active_pokemon = random.choice(available_pokemons)
+            print(f"{self.name} escolheu {self.active_pokemon.name} como Pokémon ativo.")
+        else:
+            print(f"{self.name} não tem nenhum Pokémon disponível.")
             return False
-
-        print(f"{self.name}, escolha seu Pokémon ativo:")
-        for idx, pokemon in enumerate(self.pokemon_team):
-            print(f"{idx + 1}. {pokemon.name} (HP: {pokemon.hp})")
-        while True:
-            choice = input("Digite o número do Pokémon que você deseja escolher: ")
-            if choice.isdigit() and 1 <= int(choice) <= len(self.pokemon_team):
-                self.switch_active_pokemon(int(choice) - 1)
-                break
-            else:
-                print("Escolha inválida. Tente novamente.")
         return True
 
     def select_random_pokemon(self):
