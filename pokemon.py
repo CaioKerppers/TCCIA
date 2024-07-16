@@ -15,8 +15,9 @@ natures = fetch_natures()
 class Pokemon:
     banned_pokemon = banned_pokemon
 
-    def __init__(self, number, name, form, type1, type2, moveset, hp, attack, defense, sp_attack, sp_defense, speed, nature, battle_rules, level=50, ivs=None, evs=None, *args, **kwargs):
+    def __init__(self, number, id ,name, form, type1, type2, moveset, hp, attack, defense, sp_attack, sp_defense, speed, nature, battle_rules, level=50, ivs=None, evs=None, *args, **kwargs):
         self.number = number
+        self.id = id
         self.name = name
         self.form = form
         self.type1 = type1
@@ -72,8 +73,6 @@ class Pokemon:
                 y.append([reward if i == move_index else 0 for i in range(len(self.moveset))])
         X = np.array(X)
         y = np.array(y)
-        print("Shape of X:", X.shape)
-        print("Shape of y:", y.shape)
         return X, y
 
     def generate_random_ivs(self):
@@ -157,16 +156,17 @@ class Pokemon:
 
     def check_play_restrictions(self, team):
         species_count = sum(1 for pokemon in team if pokemon.name == self.name)
-        if species_count > 1:
+        if species_count > 100:
             return False
         return True
 
     @staticmethod
-    def get_pokemon_info(pokemon_name):
+    def get_pokemon_info(pokemon_id):
         try:
-            poke = pb.pokemon(pokemon_name.lower())
+            poke = pb.pokemon(pokemon_id)
             if poke:
-                name = poke.name.capitalize()
+                id = poke.id
+                name = poke.name
                 types = [t.type.name.capitalize() for t in poke.types] if poke.types else []
                 moveset = [move.move.name.capitalize() for move in poke.moves] if poke.moves else []
                 hp = poke.stats[0].base_stat
@@ -175,10 +175,10 @@ class Pokemon:
                 sp_attack = poke.stats[3].base_stat
                 sp_defense = poke.stats[4].base_stat
                 speed = poke.stats[5].base_stat
-                return name, types, moveset, hp, attack, defense, sp_attack, sp_defense, speed
+                return id, name, types, moveset, hp, attack, defense, sp_attack, sp_defense, speed
         except Exception as e:
             print(f"Error retrieving Pokémon info from API: {e}")
-        print(f"Não foi possível obter dados para o Pokémon {pokemon_name}")
+        print(f"Não foi possível obter dados para o Pokémon {pokemon_id}")
         return None
 
     def select_move(self, opponent):
@@ -196,13 +196,20 @@ class Pokemon:
         self.confirm_attack(opponent)
         
     def select_move_automatically(self, opponent):
-        state = self.get_state(self, opponent)
-        q_values = self.model.predict(np.array(state).reshape(1, -1))
-        move_index = np.argmax(q_values[0])
-        self.selected_move = self.moveset[move_index]
-        print(f"{self.name} (AI) selected move: {self.selected_move}")
-        self.show_move_info(self.selected_move)
-        self.confirm_attack(opponent)
+        # Obter o estado atual do jogo
+        state = self.get_state(opponent)
+        
+        # Verifique se todos os elementos do estado são numéricos
+        state = np.array(state, dtype=np.float32)
+
+        # Prever o melhor movimento com base no estado atual
+        q_values = self.model.predict(state.reshape(1, -1))
+        best_move_index = np.argmax(q_values)
+        
+        # Escolher e executar o melhor movimento
+        best_move = self.moves[best_move_index]
+        print(f"{self.name} usa {best_move['name']}!")
+        self.execute_move(best_move, opponent)
 
     def select_random_move(self, opponent):
         self.selected_move = random.choice(self.moveset)
