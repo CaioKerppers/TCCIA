@@ -3,7 +3,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 
 # Initialize Firebase Admin SDK
-cred = credentials.Certificate('pokemonbattleia-firebase-adminsdk-rjtw2-b0570ded93.json')
+cred = credentials.Certificate('pokemonbattleia-firebase-adminsdk-rjtw2-7c11d2875b.json')
 firebase_admin.initialize_app(cred)
 
 db = firestore.client()
