@@ -3,7 +3,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 
 # Initialize Firebase Admin SDK
-cred = credentials.Certificate('pokemonbattleia-firebase-adminsdk-rjtw2-7c11d2875b.json')
+cred = credentials.Certificate('pokemonbattleia-firebase-adminsdk-rjtw2-5b245d2649.json')
 firebase_admin.initialize_app(cred)
 
 db = firestore.client()
@@ -36,3 +36,11 @@ def fetch_natures():
     for doc in natures_ref.stream():
         natures[doc.id] = doc.to_dict()
     return natures
+
+def fetch_type_to_int():
+    doc_ref = db.collection("types_id").document("type_to_int")
+    doc = doc_ref.get()
+    if doc.exists:
+        return doc.to_dict()
+    else:
+        raise ValueError("Não foi possível carregar type_to_int do Firebase")
