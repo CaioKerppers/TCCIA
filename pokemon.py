@@ -5,13 +5,14 @@ import numpy as np
 import random
 import pokebase as pb
 from collections import deque
-from fetch_functions import fetch_banned_pokemon, fetch_type_chart, fetch_natures
+from fetch_functions import fetch_banned_pokemon, fetch_type_chart, fetch_natures, fetch_type_to_int
 from utils import get_random_nature
 from utils import get_stat_multipliers
 
 type_chart = fetch_type_chart()
 banned_pokemon = fetch_banned_pokemon()
 natures = fetch_natures()
+type_to_int = fetch_type_to_int()
 
 class Pokemon:
     banned_pokemon = banned_pokemon
@@ -368,11 +369,12 @@ class Pokemon:
     def get_state(self, agent_pokemon, opponent_pokemon):
         agent_hp = agent_pokemon.hp
         opponent_hp = opponent_pokemon.hp
-        agent_type1 = agent_pokemon.type1
-        agent_type2 = agent_pokemon.type2 if self.type2 else "None"
-        opponent_type1 = opponent_pokemon.type1
-        opponent_type2 = opponent_pokemon.type2 if opponent_pokemon.type2 else "None"
+        agent_type1 = type_to_int[agent_pokemon.type1.lower()]
+        agent_type2 = type_to_int[agent_pokemon.type2.lower()] if agent_pokemon.type2 else type_to_int["none"]
+        opponent_type1 = type_to_int[opponent_pokemon.type1.lower()]
+        opponent_type2 = type_to_int[opponent_pokemon.type2.lower()] if opponent_pokemon.type2 else type_to_int["none"]
         return (agent_hp, opponent_hp, agent_type1, agent_type2, opponent_type1, opponent_type2)
+
 
     def update_q_table(self, opponent, damage):
         state = tuple(self.get_state(self, opponent))
