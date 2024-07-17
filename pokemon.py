@@ -7,6 +7,7 @@ import pokebase as pb
 from collections import deque
 from fetch_functions import fetch_banned_pokemon, fetch_type_chart, fetch_natures
 from utils import get_random_nature
+from utils import get_stat_multipliers
 
 type_chart = fetch_type_chart()
 banned_pokemon = fetch_banned_pokemon()
@@ -15,19 +16,19 @@ natures = fetch_natures()
 class Pokemon:
     banned_pokemon = banned_pokemon
 
-    def __init__(self, number, id ,name, form, type1, type2, moveset, hp, attack, defense, sp_attack, sp_defense, speed, nature, battle_rules, level=50, ivs=None, evs=None, *args, **kwargs):
+    def __init__(self, number, id, name, form, type1, type2, moveset, hp, attack, defense, sp_attack, sp_defense, speed, nature, battle_rules, level=50, ivs=None, evs=None, *args, **kwargs):
         self.number = number
         self.id = id
         self.name = name
         self.form = form
         self.type1 = type1
         self.type2 = type2
-        self.hp = hp
-        self.attack = attack
-        self.defense = defense
-        self.sp_attack = sp_attack
-        self.sp_defense = sp_defense
-        self.speed = speed
+        self.base_hp = hp
+        self.base_attack = attack
+        self.base_defense = defense
+        self.base_sp_attack = sp_attack
+        self.base_sp_defense = sp_defense
+        self.base_speed = speed
         self.nature = nature
         self.battle_rules = battle_rules
         self.moveset = moveset
@@ -45,6 +46,9 @@ class Pokemon:
         self.learning_rate = 0.001
         self.model = self.build_model(input_dim=6, output_dim=len(moveset))
         self.status = None  # Adiciona o atributo de status
+        self.stat_stages = {"attack": 0, "defense": 0, "sp_attack": 0, "sp_defense": 0, "speed": 0}
+        self.load_stat_multipliers()
+        self.calculate_final_stats()
     
     def build_model(self, input_dim, output_dim):
         model = Sequential()
@@ -107,6 +111,24 @@ class Pokemon:
             evs[stat] += increment
             remaining_evs -= increment
         return evs
+    
+    def load_stat_multipliers(self):
+        # Carregar multiplicadores de estágios de stats do Firebase
+        self.STAT_STAGE_MULTIPLIERS = get_stat_multipliers()
+        
+    def apply_buff(self, stat, stages):
+        if stat in self.stat_stages:
+            self.stat_stages[stat] += stages
+            self.stat_stages[stat] = min(6, max(-6, self.stat_stages[stat]))
+            print(f"{self.name} recebeu um buff em {stat}: {stages} estágios. Novo estágio: {self.stat_stages[stat]}")
+        self.calculate_final_stats()
+
+    def apply_debuff(self, stat, stages):
+        if stat in self.stat_stages:
+            self.stat_stages[stat] -= stages
+            self.stat_stages[stat] = min(6, max(-6, self.stat_stages[stat]))
+            print(f"{self.name} recebeu um debuff em {stat}: {stages} estágios. Novo estágio: {self.stat_stages[stat]}")
+        self.calculate_final_stats()
 
     def apply_nature_effects(self, stat_name):
         nature_increase, nature_decrease = natures[self.nature]
@@ -124,17 +146,26 @@ class Pokemon:
         return ((((2 * base + iv + (evs // 4)) * level) // 100) + level + 10)
 
     def calculate_final_stats(self):
-        self.hp = self.calculate_hp_stat(self.hp, self.ivs['hp'], self.evs['hp'], self.level)
-        self.attack = self.calculate_stat(self.attack, self.ivs['attack'], self.evs['attack'], self.level)
+        self.hp = self.calculate_hp_stat(self.base_hp, self.ivs['hp'], self.evs['hp'], self.level)
+        self.attack = self.calculate_stat(self.base_attack, self.ivs['attack'], self.evs['attack'], self.level)
         self.attack = self.apply_nature_effects('attack')
-        self.defense = self.calculate_stat(self.defense, self.ivs['defense'], self.evs['defense'], self.level)
+        self.defense = self.calculate_stat(self.base_defense, self.ivs['defense'], self.evs['defense'], self.level)
         self.defense = self.apply_nature_effects('defense')
-        self.sp_attack = self.calculate_stat(self.sp_attack, self.ivs['sp_attack'], self.evs['sp_attack'], self.level)
+        self.sp_attack = self.calculate_stat(self.base_sp_attack, self.ivs['sp_attack'], self.evs['sp_attack'], self.level)
         self.sp_attack = self.apply_nature_effects('sp_attack')
-        self.sp_defense = self.calculate_stat(self.sp_defense, self.ivs['sp_defense'], self.evs['sp_defense'], self.level)
+        self.sp_defense = self.calculate_stat(self.base_sp_defense, self.ivs['sp_defense'], self.evs['sp_defense'], self.level)
         self.sp_defense = self.apply_nature_effects('sp_defense')
-        self.speed = self.calculate_stat(self.speed, self.ivs['speed'], self.evs['speed'], self.level)
+        self.speed = self.calculate_stat(self.base_speed, self.ivs['speed'], self.evs['speed'], self.level)
         self.speed = self.apply_nature_effects('speed')
+        self.attack = self.apply_stat_change(self.attack, self.stat_stages["attack"])
+        self.defense = self.apply_stat_change(self.defense, self.stat_stages["defense"])
+        self.sp_attack = self.apply_stat_change(self.sp_attack, self.stat_stages["sp_attack"])
+        self.sp_defense = self.apply_stat_change(self.sp_defense, self.stat_stages["sp_defense"])
+        self.speed = self.apply_stat_change(self.speed, self.stat_stages["speed"])
+        
+    def apply_stat_change(self, base_value, stage):
+        multiplier = self.STAT_STAGE_MULTIPLIERS[str(stage)]
+        return int(base_value * multiplier)
         
     def get_type_effectiveness(move_type, defender_types):
         effectiveness = 1.0
@@ -196,20 +227,13 @@ class Pokemon:
         self.confirm_attack(opponent)
         
     def select_move_automatically(self, opponent):
-        # Obter o estado atual do jogo
-        state = self.get_state(opponent)
-        
-        # Verifique se todos os elementos do estado são numéricos
-        state = np.array(state, dtype=np.float32)
-
-        # Prever o melhor movimento com base no estado atual
-        q_values = self.model.predict(state.reshape(1, -1))
+        state = self.get_state(self, opponent)
+        q_values = self.model.predict(np.array(state).reshape(1, -1))
         best_move_index = np.argmax(q_values)
-        
-        # Escolher e executar o melhor movimento
-        best_move = self.moves[best_move_index]
-        print(f"{self.name} usa {best_move['name']}!")
-        self.execute_move(best_move, opponent)
+        best_move = self.moveset[best_move_index]
+        self.selected_move = best_move
+        print(f"{self.name} usa {self.selected_move}!")
+        self.confirm_attack(opponent)
 
     def select_random_move(self, opponent):
         self.selected_move = random.choice(self.moveset)
@@ -224,22 +248,27 @@ class Pokemon:
                 move_name, move_type, move_power, move_accuracy, damage_class, status_effects = move_info
                 print(f"{self.name} used {self.selected_move}!")
                 print(f"Move info: Name={move_name}, Type={move_type}, Power={move_power}, Accuracy={move_accuracy}, Class={damage_class}")
-                if move_power:  # Verifica se há poder (dano) para o movimento
-                    damage = self.calculate_damage(self, opponent, move_info)
-                    print(f"Damage calculated: {damage:.2f}")
-                    opponent.hp -= damage
-                    if opponent.hp < 0:
-                        opponent.hp = 0
-                    print(f"{opponent.name}'s HP dropped to {opponent.hp}")
-                    self.update_q_table(opponent, damage)
+                
+                if self.resolve_status():
+                    if move_power:  # Verifica se há poder (dano) para o movimento
+                        damage = self.calculate_damage(self, opponent, move_info)
+                        print(f"Damage calculated: {damage:.2f}")
+                        opponent.hp -= damage
+                        if opponent.hp < 0:
+                            opponent.hp = 0
+                        print(f"{opponent.name}'s HP dropped to {opponent.hp}")
+                        self.update_q_table(opponent, damage)
+                    else:
+                        print("Move has no power (might be a status move).")
+                    for status in status_effects:
+                        self.apply_status_effect(opponent, status)
                 else:
-                    print("Move has no power (might be a status move).")
-                for status in status_effects:
-                    self.apply_status_effect(opponent, status)
+                    print(f"{self.name} não pode atacar devido ao status {self.status}.")
             else:
                 print(f"Could not retrieve move info for {self.selected_move}")
         else:
             print("No move selected.")
+
 
     @staticmethod
     def calculate_damage(attacker, defender, move_info):
@@ -340,9 +369,9 @@ class Pokemon:
         agent_hp = agent_pokemon.hp
         opponent_hp = opponent_pokemon.hp
         agent_type1 = agent_pokemon.type1
-        agent_type2 = agent_pokemon.type2
+        agent_type2 = agent_pokemon.type2 if self.type2 else "None"
         opponent_type1 = opponent_pokemon.type1
-        opponent_type2 = opponent_pokemon.type2
+        opponent_type2 = opponent_pokemon.type2 if opponent_pokemon.type2 else "None"
         return (agent_hp, opponent_hp, agent_type1, agent_type2, opponent_type1, opponent_type2)
 
     def update_q_table(self, opponent, damage):
@@ -353,21 +382,57 @@ class Pokemon:
         self.q_table[state][self.selected_move] = (1 - self.learning_rate) * self.q_table[state][self.selected_move] + self.learning_rate * (reward + self.gamma * np.max(list(self.q_table[state].values())))
 
     def apply_status_effect(self, opponent, status):
+    # Aplicar efeitos de status
         if status == "paralyze":
             opponent.status = "paralyzed"
-            print(f"{opponent.name} is paralyzed!")
+            print(f"{opponent.name} foi paralisado!")
         elif status == "burn":
             opponent.status = "burned"
-            print(f"{opponent.name} is burned!")
+            print(f"{opponent.name} foi queimado!")
         elif status == "freeze":
             opponent.status = "frozen"
-            print(f"{opponent.name} is frozen!")
+            print(f"{opponent.name} foi congelado!")
         elif status == "sleep":
-            opponent.status = "asleep"
-            print(f"{opponent.name} fell asleep!")
+            opponent.status = "sleep"
+            print(f"{opponent.name} adormeceu!")
         elif status == "poison":
             opponent.status = "poisoned"
-            print(f"{opponent.name} is poisoned!")
+            print(f"{opponent.name} foi envenenado!")
         elif status == "confuse":
             opponent.status = "confused"
-            print(f"{opponent.name} is confused!")
+            print(f"{opponent.name} foi confundido!")
+
+    def is_status_effected(self):
+        return self.status in ["paralyzed", "burned", "frozen", "sleep", "poisoned", "confused"]
+
+    def resolve_status(self):
+        if self.status == "paralyzed":
+            if random.random() < 0.25:
+                print(f"{self.name} está paralisado e não pode se mover!")
+                return False
+        elif self.status == "burned":
+            self.hp -= self.hp * 0.125
+            print(f"{self.name} está queimado e perdeu HP!")
+        elif self.status == "frozen":
+            if random.random() < 0.2:
+                self.status = None
+                print(f"{self.name} descongelou!")
+            else:
+                print(f"{self.name} está congelado e não pode se mover!")
+                return False
+        elif self.status == "sleep":
+            if random.randint(1, 3) == 3:
+                self.status = None
+                print(f"{self.name} acordou!")
+            else:
+                print(f"{self.name} está dormindo e não pode se mover!")
+                return False
+        elif self.status == "poisoned":
+            self.hp -= self.hp * 0.125
+            print(f"{self.name} está envenenado e perdeu HP!")
+        elif self.status == "confused":
+            if random.random() < 0.33:
+                self.hp -= self.hp * 0.1
+                print(f"{self.name} está confuso e se machucou na confusão!")
+                return False
+        return True

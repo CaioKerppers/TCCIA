@@ -1,5 +1,6 @@
 import random
 from google.cloud import firestore
+from fetch_functions import fetch_stat_multipliers
 
 def get_random_nature(natures_ref):
     try:
@@ -12,3 +13,6 @@ def get_random_nature(natures_ref):
     except Exception as e:
         print(f"Erro ao acessar o Firestore: {e}")
         raise
+    
+def get_stat_multipliers():
+    return fetch_stat_multipliers()

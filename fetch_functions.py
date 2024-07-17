@@ -3,7 +3,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 
 # Initialize Firebase Admin SDK
-cred = credentials.Certificate('pokemonbattleia-firebase-adminsdk-rjtw2-9488aa62de.json')
+cred = credentials.Certificate('pokemonbattleia-firebase-adminsdk-rjtw2-b0570ded93.json')
 firebase_admin.initialize_app(cred)
 
 db = firestore.client()
@@ -21,6 +21,14 @@ def fetch_type_chart():
     for doc in type_chart_ref.stream():
         type_chart[doc.id] = doc.to_dict()
     return type_chart
+
+def fetch_stat_multipliers():
+    doc_ref = db.collection("stats").document("stat_stage_multipliers")
+    doc = doc_ref.get()
+    if doc.exists:
+        return doc.to_dict()
+    else:
+        raise ValueError("Não foi possível carregar os multiplicadores de estágios de stats do Firebase")
 
 def fetch_natures():
     natures_ref = db.collection('Natures')
