@@ -48,3 +48,7 @@ def select_team(trainer, battle_rules):
                 print(f"{pokemon.name} é banido e não pode ser selecionado.")
         else:
             print("Pokémon inválido foi gerado, tentando novamente.")
+            
+            
+            
+     

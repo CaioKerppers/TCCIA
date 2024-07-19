@@ -1,5 +1,5 @@
 import random
-    
+
 class Trainer:
     def __init__(self, name):
         self.name = name
@@ -47,17 +47,12 @@ class Trainer:
             print(f"{self.name} has no available Pokémon.")
             return False
 
-        while True:
-            user_input = input("Do you want to switch Pokémon or forfeit the battle? (switch/forfeit): ").strip().lower()
-            if user_input == "switch":
-                if self.choose_active_pokemon():
-                    break
-            elif user_input == "forfeit":
-                print(f"{self.name} has forfeited the battle.")
-                return False
-            else:
-                print("Invalid input. Please enter 'switch' or 'forfeit'.")
-        return True
+        if self.choose_active_pokemon():
+            print(f"{self.name} automatically chose {self.active_pokemon.name} as the new active Pokémon.")
+            return True
+        else:
+            print(f"{self.name} has no available Pokémon.")
+            return False
 
     def all_pokemons_fainted(self):
         return all(pokemon.hp == 0 for pokemon in self.pokemon_team)

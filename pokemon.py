@@ -51,6 +51,15 @@ class Pokemon:
         self.load_stat_multipliers()
         self.calculate_final_stats()
     
+    @tf.function(input_signature=[tf.TensorSpec(shape=[None, 6], dtype=tf.float32), tf.TensorSpec(shape=[None, None], dtype=tf.float32)], reduce_retracing=True)
+    def train_step(self, X, y):
+        with tf.GradientTape() as tape:
+            predictions = self.model(X, training=True)
+            loss = tf.keras.losses.MeanSquaredError()(y, predictions)
+        gradients = tape.gradient(loss, self.model.trainable_variables)
+        self.model.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
+        return loss
+    
     def build_model(self, input_dim, output_dim):
         model = Sequential()
         model.add(Input(shape=(input_dim,)))
@@ -65,7 +74,11 @@ class Pokemon:
         if X.shape[0] == 0 or y.shape[0] == 0:
             print("Not enough data to train the model.")
             return
-        self.model.fit(X, y, epochs=100, verbose=1)
+        dataset = tf.data.Dataset.from_tensor_slices((X, y)).batch(32)
+        for epoch in range(100):
+            for batch_X, batch_y in dataset:
+                loss = self.train_step(batch_X, batch_y)
+            print(f"Epoch {epoch + 1}, Loss: {loss.numpy()}")
     
     def prepare_data(self):
         X = []
@@ -79,6 +92,37 @@ class Pokemon:
         X = np.array(X)
         y = np.array(y)
         return X, y
+    
+    def save_model(self, filepath):
+        """Save the model's weights and architecture separately."""
+        try:
+            # Save weights
+            weights_filepath = filepath + '_weights.h5'
+            self.model.save_weights(weights_filepath)
+            print(f"Weights saved successfully at {weights_filepath}.")
+            # Save architecture
+            architecture_filepath = filepath + '_architecture.json'
+            with open(architecture_filepath, 'w') as json_file:
+                json_file.write(self.model.to_json())
+            print(f"Architecture saved successfully at {architecture_filepath}.")
+        except Exception as e:
+            print(f"Error saving the model: {e}")
+
+    def load_model(self, filepath):
+        """Load the model's weights and architecture separately."""
+        try:
+            # Load architecture
+            architecture_filepath = filepath + '_architecture.json'
+            with open(architecture_filepath, 'r') as json_file:
+                model_json = json_file.read()
+                self.model = tf.keras.models.model_from_json(model_json)
+            print(f"Architecture loaded successfully from {architecture_filepath}.")
+            # Load weights
+            weights_filepath = filepath + '_weights.h5'
+            self.model.load_weights(weights_filepath)
+            print(f"Weights loaded successfully from {weights_filepath}.")
+        except Exception as e:
+            print(f"Error loading the model: {e}")
 
     def generate_random_ivs(self):
         return {
@@ -188,7 +232,7 @@ class Pokemon:
 
     def check_play_restrictions(self, team):
         species_count = sum(1 for pokemon in team if pokemon.name == self.name)
-        if species_count > 100:
+        if species_count > 1:
             return False
         return True
 
@@ -214,7 +258,7 @@ class Pokemon:
         return None
 
     def select_move(self, opponent):
-        state = self.get_state(self, opponent)
+        state = self.get_state_for_model(self, opponent)
         if np.random.rand() <= self.epsilon:
             move_index = random.randint(0, len(self.moveset) - 1)
         else:
@@ -228,7 +272,7 @@ class Pokemon:
         self.confirm_attack(opponent)
         
     def select_move_automatically(self, opponent):
-        state = self.get_state(self, opponent)
+        state = self.get_state_for_model(self, opponent)
         q_values = self.model.predict(np.array(state).reshape(1, -1))
         best_move_index = np.argmax(q_values)
         best_move = self.moveset[best_move_index]
@@ -269,7 +313,6 @@ class Pokemon:
                 print(f"Could not retrieve move info for {self.selected_move}")
         else:
             print("No move selected.")
-
 
     @staticmethod
     def calculate_damage(attacker, defender, move_info):
@@ -366,7 +409,7 @@ class Pokemon:
                 advantage *= multiplier
         return advantage
     
-    def get_state(self, agent_pokemon, opponent_pokemon):
+    def get_state_for_model(self, agent_pokemon, opponent_pokemon):
         agent_hp = agent_pokemon.hp
         opponent_hp = opponent_pokemon.hp
         agent_type1 = type_to_int[agent_pokemon.type1.lower()]
@@ -375,9 +418,8 @@ class Pokemon:
         opponent_type2 = type_to_int[opponent_pokemon.type2.lower()] if opponent_pokemon.type2 else type_to_int["none"]
         return (agent_hp, opponent_hp, agent_type1, agent_type2, opponent_type1, opponent_type2)
 
-
     def update_q_table(self, opponent, damage):
-        state = tuple(self.get_state(self, opponent))
+        state = tuple(self.get_state_for_model(self, opponent))
         reward = damage
         if state not in self.q_table:
             self.q_table[state] = {move: 0 for move in self.moveset}
@@ -438,3 +480,12 @@ class Pokemon:
                 print(f"{self.name} está confuso e se machucou na confusão!")
                 return False
         return True
+
+    def get_state(self, agent_pokemon, opponent_pokemon):
+        agent_hp = agent_pokemon.hp
+        opponent_hp = opponent_pokemon.hp
+        agent_type1 = agent_pokemon.type1
+        agent_type2 = agent_pokemon.type2 if agent_pokemon.type2 else "None"
+        opponent_type1 = opponent_pokemon.type1
+        opponent_type2 = opponent_pokemon.type2 if opponent_pokemon.type2 else "None"
+        return (agent_hp, opponent_hp, agent_type1, agent_type2, opponent_type1, opponent_type2)
