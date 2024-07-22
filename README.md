@@ -1,106 +1,121 @@
+
 # Pokémon Battle Simulator
 
-Este projeto é um simulador de batalhas Pokémon em Python, utilizando a biblioteca Pokébase para obter informações detalhadas sobre Pokémon e seus movimentos. O objetivo é simular batalhas, aplicar regras de combate e utilizar aprendizado por reforço para melhorar a estratégia dos Pokémon ao longo do tempo.
+## Descrição
 
-## Requisitos
+Este projeto é um simulador de batalhas Pokémon. Ele permite a criação de times de Pokémon com base em dados aleatórios e configurações de regras específicas, bem como a realização de batalhas automáticas entre treinadores. O projeto utiliza dados da API PokéBase e o Firestore como banco de dados.
 
-- Python 3.x
-- Biblioteca `pokebase`
-- Biblioteca `csv`
+## Estrutura do Projeto
 
-Você pode instalar a biblioteca `pokebase` utilizando o pip:
+O projeto está dividido nos seguintes módulos:
 
-```bash
-pip install pokebase
-```
+1. `battleRules.py`: Define as regras das batalhas.
+2. `data_fetching.py`: Seleciona Pokémon aleatórios e monta os times dos treinadores.
+3. `fetch_functions.py`: Funções para buscar dados no Firestore.
+4. `utils.py`: Funções utilitárias.
+5. `trainer.py`: Define a classe do treinador e suas ações.
+6. `pokemon.py`: Define a classe do Pokémon e suas ações.
 
-## Estrutura do Código
-
-### Classe `Pokemon`
-
-A classe `Pokemon` representa um Pokémon individual e contém informações detalhadas sobre o Pokémon, incluindo suas estatísticas, tipos, movimentos e natureza. Ela possui métodos para verificar se o Pokémon é banido, aplicar nível automático, selecionar e usar movimentos, aplicar efeitos da natureza e atualizar a tabela Q para aprendizado por reforço.
-
-#### Métodos Principais
-
-- `__init__`: Inicializa um novo Pokémon com suas características.
-- `is_banned`: Verifica se o Pokémon é banido para batalhas.
-- `auto_level`: Ajusta o nível do Pokémon para 50 durante batalhas.
-- `check_play_restrictions`: Verifica restrições de jogo como cláusula de item e espécie.
-- `get_pokemon_info`: Obtém informações do Pokémon utilizando a API Pokébase ou um arquivo CSV.
-- `select_move`: Seleciona um movimento aleatório do conjunto de movimentos do Pokémon.
-- `use_move`: Utiliza o movimento selecionado contra um oponente.
-- `confirm_attack`: Confirma o uso do movimento selecionado.
-- `get_move_info`: Obtém informações detalhadas sobre um movimento.
-- `show_move_info`: Mostra informações sobre o movimento selecionado.
-- `update_q_table`: Atualiza a tabela Q com o resultado da ação.
-- `apply_nature`: Aplica os efeitos da natureza do Pokémon.
-- `receive_status`: Aplica um status ao Pokémon.
-
-### Classe `Trainer`
-
-A classe `Trainer` representa um treinador de Pokémon e gerencia sua equipe de Pokémon. Ela permite adicionar novos Pokémon à equipe e selecionar o Pokémon ativo para batalha.
-
-#### Métodos Principais
-
-- `__init__`: Inicializa um novo treinador com as regras de batalha.
-- `add_pokemon`: Adiciona um novo Pokémon à equipe do treinador.
-- `switch_active_pokemon`: Troca o Pokémon ativo do treinador.
-- `select_move`: Seleciona um movimento para o Pokémon ativo.
-- `use_move`: Usa o movimento do Pokémon ativo contra um oponente.
+## battleRules.py
 
 ### Classe `BattleRules`
 
-A classe `BattleRules` define as regras de batalha, incluindo as vantagens e desvantagens de tipo para calcular o dano.
+Define as regras das batalhas, como o nível máximo permitido e o tamanho do time.
 
-#### Métodos Principais
+- `apply_rules(trainer1, trainer2)`: Aplica as regras aos times dos treinadores, ajustando o nível dos Pokémon e verificando restrições.
 
-- `__init__`: Inicializa as regras de batalha com vantagens e desvantagens de tipo.
+## data_fetching.py
 
-## Funções Auxiliares
+### Funções Principais
 
-- `get_state`: Obtém o estado atual do Pokémon do agente e do oponente.
+- `select_random_pokemon(num_pokemon, battle_rules)`: Seleciona Pokémon aleatórios com base nas regras da batalha.
+- `select_team(trainer, battle_rules)`: Seleciona o time do treinador aleatoriamente, garantindo que os Pokémon selecionados não sejam banidos.
 
-## Como Usar
+## fetch_functions.py
 
-1. **Criação de Treinadores e Pokémon**:
-    - Crie instâncias da classe `Trainer` para cada treinador.
-    - Adicione Pokémon à equipe de cada treinador utilizando o método `add_pokemon`.
+### Funções de Busca
 
-2. **Configuração da Batalha**:
-    - Defina as regras de batalha utilizando a classe `BattleRules`.
+- `fetch_banned_pokemon()`: Busca a lista de Pokémon banidos no Firestore.
+- `fetch_type_chart()`: Busca a tabela de tipos no Firestore.
+- `fetch_stat_multipliers()`: Busca os multiplicadores de estágios de stats no Firestore.
+- `fetch_natures()`: Busca as naturezas dos Pokémon no Firestore.
+- `fetch_type_to_int()`: Busca o mapeamento de tipos para inteiros no Firestore.
 
-3. **Simulação da Batalha**:
-    - Utilize os métodos `select_move` e `use_move` para simular os turnos de batalha entre os Pokémon ativos dos treinadores.
+## utils.py
 
-4. **Aprendizado por Reforço**:
-    - A tabela Q será atualizada com os resultados das ações para melhorar a estratégia dos Pokémon ao longo do tempo.
+### Funções Utilitárias
 
-### Exemplo de Uso
+- `get_random_nature(natures_ref)`: Retorna uma natureza aleatória do banco de dados.
+- `get_stat_multipliers()`: Retorna os multiplicadores de estágios de stats.
 
-```python
-# Inicializar regras de batalha
-battle_rules = BattleRules()
+## trainer.py
 
-# Criar treinadores
-trainer1 = Trainer(battle_rules)
-trainer2 = Trainer(battle_rules)
+### Classe `Trainer`
 
-# Adicionar Pokémon aos treinadores
-trainer1.add_pokemon("Pikachu")
-trainer2.add_pokemon("Charmander")
+Define o treinador e suas ações, como adicionar Pokémon ao time, selecionar o Pokémon ativo e realizar turnos de batalha.
 
-# Selecionar Pokémon ativo
-trainer1.switch_active_pokemon(0)
-trainer2.switch_active_pokemon(0)
+- `add_pokemon(pokemon)`: Adiciona um Pokémon ao time do treinador.
+- `switch_active_pokemon(index)`: Troca o Pokémon ativo do treinador.
+- `choose_active_pokemon()`: Escolhe um Pokémon ativo aleatoriamente dentre os disponíveis.
+- `battle_turn(opponent_trainer)`: Realiza o turno de batalha do treinador.
+- `handle_fainted_pokemon()`: Lida com o Pokémon desmaiado do treinador.
+- `all_pokemons_fainted()`: Verifica se todos os Pokémon do treinador estão desmaiados.
 
-# Simular turno de batalha
-trainer1.select_move(trainer2.active_pokemon)
-trainer1.use_move(trainer2.active_pokemon)
+## pokemon.py
 
-trainer2.select_move(trainer1.active_pokemon)
-trainer2.use_move(trainer1.active_pokemon)
-```
+### Classe `Pokemon`
 
+Define o Pokémon e suas ações, incluindo a seleção de movimentos, cálculo de danos e treinamento do modelo de aprendizado por reforço.
+
+- `__init__(...)`: Inicializa os atributos do Pokémon, como stats, naturezas e nível.
+- `train_step(X, y)`: Realiza um passo de treinamento do modelo.
+- `build_model(input_dim, output_dim)`: Constrói o modelo de aprendizado por reforço.
+- `train_model()`: Treina o modelo de aprendizado por reforço.
+- `prepare_data()`: Prepara os dados para o treinamento do modelo.
+- `save_model(filepath)`: Salva o modelo no caminho especificado.
+- `load_model(filepath)`: Carrega o modelo do caminho especificado.
+- `generate_random_ivs()`: Gera IVs aleatórios para o Pokémon.
+- `generate_random_evs()`: Gera EVs aleatórios para o Pokémon.
+- `load_stat_multipliers()`: Carrega os multiplicadores de estágios de stats do Firestore.
+- `apply_buff(stat, stages)`: Aplica um buff ao stat do Pokémon.
+- `apply_debuff(stat, stages)`: Aplica um debuff ao stat do Pokémon.
+- `apply_nature_effects(stat_name)`: Aplica os efeitos da natureza ao stat do Pokémon.
+- `calculate_stat(base, iv, evs, level)`: Calcula o stat do Pokémon.
+- `calculate_hp_stat(base, iv, evs, level)`: Calcula o stat de HP do Pokémon.
+- `calculate_final_stats()`: Calcula os stats finais do Pokémon.
+- `apply_stat_change(base_value, stage)`: Aplica a mudança de estágio ao stat do Pokémon.
+- `get_type_effectiveness(move_type, defender_types)`: Calcula a eficácia do tipo do movimento.
+- `is_banned()`: Verifica se o Pokémon é banido.
+- `auto_level()`: Ajusta o nível do Pokémon automaticamente.
+- `check_play_restrictions(team)`: Verifica as restrições de uso do Pokémon.
+- `get_pokemon_info(pokemon_id)`: Obtém as informações do Pokémon pela API PokéBase.
+- `select_move(opponent)`: Seleciona o movimento do Pokémon.
+- `select_move_automatically(opponent)`: Seleciona automaticamente o movimento do Pokémon.
+- `select_random_move(opponent)`: Seleciona um movimento aleatório para o Pokémon.
+- `use_move(opponent)`: Usa o movimento selecionado contra o oponente.
+- `calculate_damage(attacker, defender, move_info)`: Calcula o dano do movimento.
+- `confirm_attack(opponent)`: Confirma o ataque do Pokémon.
+- `get_move_info(move)`: Obtém as informações do movimento pela API PokéBase.
+- `show_move_info(move)`: Mostra as informações do movimento.
+
+## Como Executar
+
+1. **Instale as dependências**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. **Configure o Firestore**:
+   - Adicione suas credenciais do Firebase em `pokemonbattleia-firebase-adminsdk-rjtw2-7c11d2875b.json`.
+
+3. **Execute o simulador**:
+   ```bash
+   python main.py
+   ```
+
+## Contribuição
+
+Sinta-se à vontade para abrir issues e pull requests para melhorias no projeto.
 
 ## Licença
 
