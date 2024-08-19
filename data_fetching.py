@@ -49,6 +49,3 @@ def select_team(trainer, battle_rules):
         else:
             print("Pokémon inválido foi gerado, tentando novamente.")
             
-            
-            
-     
