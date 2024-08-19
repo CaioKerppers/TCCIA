@@ -3,3 +3,4 @@ tensorflow
 pokebase
 numpy
 firebase-admin
+pygame

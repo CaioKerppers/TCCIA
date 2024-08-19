@@ -16,3 +16,13 @@ def get_random_nature(natures_ref):
     
 def get_stat_multipliers():
     return fetch_stat_multipliers()
+
+def save_model(model_name, model_data):
+    db = firestore.Client()
+    try:
+        doc_ref = db.collection('models').document(model_name)
+        doc_ref.set(model_data)
+        print(f"Modelo {model_name} salvo com sucesso.")
+    except Exception as e:
+        print(f"Erro ao salvar o modelo {model_name}: {e}")
+        raise
