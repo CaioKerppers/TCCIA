@@ -8,6 +8,7 @@ from collections import deque
 from fetch_functions import fetch_banned_pokemon, fetch_type_chart, fetch_natures, fetch_type_to_int
 from utils import get_random_nature
 from utils import get_stat_multipliers
+import os
 
 type_chart = fetch_type_chart()
 banned_pokemon = fetch_banned_pokemon()
@@ -15,7 +16,7 @@ natures = fetch_natures()
 type_to_int = fetch_type_to_int()
 
 class Pokemon:
-    filepath = 'D:\PI-III\modelos'
+    filepath = r'C:/Users/rosan/Videos/3º/TCCv2.1/models/larvesta_model'
     
     banned_pokemon = banned_pokemon
 
@@ -51,6 +52,7 @@ class Pokemon:
         self.stat_stages = {"attack": 0, "defense": 0, "sp_attack": 0, "sp_defense": 0, "speed": 0}
         self.load_stat_multipliers()
         self.calculate_final_stats()
+        
 
     def build_model(self, input_dim, output_dim):
         model = Sequential()
@@ -66,13 +68,22 @@ class Pokemon:
         if X.shape[0] == 0 or y.shape[0] == 0:
             print("Not enough data to train the model.")
             return
+
         X = X.astype(np.float32)  # Convertendo para float32
         y = y.astype(np.float32)  # Convertendo para float32
         dataset = tf.data.Dataset.from_tensor_slices((X, y)).batch(32)
-        for epoch in range(100):
-            for batch_X, batch_y in dataset:
-                loss = self.train_step(batch_X, batch_y)
-            print(f"Epoch {epoch + 1}, Loss: {loss.numpy()}")
+        
+        try:
+            for epoch in range(100):
+                for batch_X, batch_y in dataset:
+                    loss = self.train_step(batch_X, batch_y)
+                print(f"Epoch {epoch + 1}, Loss: {loss.numpy()}")
+        except tf.errors.OutOfRangeError:
+            print("End of dataset sequence reached during training.")
+            return
+
+        self.save_model(f'{Pokemon.filepath}/{self.name}_model')
+
 
     def prepare_data(self):
         X = []
@@ -86,45 +97,71 @@ class Pokemon:
             target_f[0][move_index] = target
             X.append(state_list)
             y.append(target_f[0])
+
+        if len(X) < 32:
+            print(f"Dataset has only {len(X)} samples, which might be insufficient for training.")
+        
         X = np.array(X)
         y = np.array(y)
         return X, y
 
     @tf.function(input_signature=[tf.TensorSpec(shape=[None, 6], dtype=tf.float32), tf.TensorSpec(shape=[None, None], dtype=tf.float32)], reduce_retracing=True)
     def train_step(self, X, y):
-        with tf.GradientTape() as tape:
-            predictions = self.model(X, training=True)
-            loss = tf.keras.losses.MeanSquaredError()(y, predictions)
-        gradients = tape.gradient(loss, self.model.trainable_variables)
-        self.model.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
-        return loss
-
-    def save_model(self, filepath):
-        """Save the model's weights and architecture separately."""
         try:
+            with tf.GradientTape() as tape:
+                predictions = self.model(X, training=True)
+                loss = tf.keras.losses.MeanSquaredError()(y, predictions)
+            gradients = tape.gradient(loss, self.model.trainable_variables)
+            self.model.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
+            return loss
+        except tf.errors.OutOfRangeError:
+            print("End of sequence during train_step.")
+            return None
+
+    def save_model(self, filepath=None):
+        """Save the model's weights and architecture separately."""
+        if filepath is None:
+            filepath = self.filepath
+        
+        try:
+            # Extrair o diretório e o nome base do arquivo
+            directory = os.path.dirname(filepath)
+            base_name = os.path.basename(filepath)
+            
             # Save weights
-            weights_filepath = filepath + '_weights.h5'
+            weights_filepath = os.path.join(directory, base_name + '.weights.h5')
+            if not weights_filepath.endswith('.h5'):
+                raise ValueError("The filename must end in `.h5`.")
             self.model.save_weights(weights_filepath)
             print(f"Weights saved successfully at {weights_filepath}.")
+            
             # Save architecture
-            architecture_filepath = filepath + '_architecture.json'
+            architecture_filepath = os.path.join(directory, base_name + '_architecture.json')
             with open(architecture_filepath, 'w') as json_file:
                 json_file.write(self.model.to_json())
             print(f"Architecture saved successfully at {architecture_filepath}.")
         except Exception as e:
             print(f"Error saving the model: {e}")
 
-    def load_model(self, filepath):
+    def load_model(self, filepath=None):
         """Load the model's weights and architecture separately."""
+        if filepath is None:
+            filepath = self.filepath
+            
         try:
+            # Extrair o diretório e o nome base do arquivo
+            directory = os.path.dirname(filepath)
+            base_name = os.path.basename(filepath)
+            
             # Load architecture
-            architecture_filepath = filepath + '_architecture.json'
+            architecture_filepath = os.path.join(directory, base_name + '_architecture.json')
             with open(architecture_filepath, 'r') as json_file:
                 model_json = json_file.read()
                 self.model = tf.keras.models.model_from_json(model_json)
             print(f"Architecture loaded successfully from {architecture_filepath}.")
+            
             # Load weights
-            weights_filepath = filepath + '_weights.h5'
+            weights_filepath = os.path.join(directory, base_name + '.weights.h5')
             self.model.load_weights(weights_filepath)
             print(f"Weights loaded successfully from {weights_filepath}.")
         except Exception as e:

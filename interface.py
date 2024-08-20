@@ -18,14 +18,14 @@ GREEN = (0, 255, 0)
 
 # Carregar Imagens
 try:
-    BACKGROUND = pygame.image.load(os.path.join("D:\\PI-III\\assets", "background.png"))
+    BACKGROUND = pygame.image.load(os.path.join("assets", "background.png"))
     print("Background image loaded successfully.")
 except pygame.error as e:
     print(f"Failed to load background image: {e}")
     BACKGROUND = None
 
 try:
-    HP_BAR = pygame.image.load(os.path.join("D:\\PI-III\\assets", "hp_bar.png"))
+    HP_BAR = pygame.image.load(os.path.join("assets", "hp_bar.png"))
     print("HP bar image loaded successfully.")
 except pygame.error as e:
     print(f"Failed to load HP bar image: {e}")

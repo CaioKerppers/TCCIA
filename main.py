@@ -1,7 +1,11 @@
+from concurrent.futures import ProcessPoolExecutor
 from battleRules import BattleRules
 from trainer import Trainer
 from data_fetching import select_team
-from interface import battle
+
+def train_pokemon_model(pokemon):
+    pokemon.train_model()
+
 
 def main():
     print("Iniciando simulação de batalha...")
@@ -28,7 +32,7 @@ def main():
             pokemon.reset()
 
     # Simular batalhas para coletar dados
-    num_battles = 2 # Número de batalhas para coletar dados
+    num_battles = 2  # Número de batalhas para coletar dados
     for battle_num in range(num_battles):
         print(f"Iniciando batalha {battle_num + 1}/{num_battles}...")
 
@@ -62,12 +66,10 @@ def main():
                 break
 
     # Treinar modelos para ambos os treinadores após coleta de dados
-    print("Treinando modelos para Ash...")
-    for pokemon in trainer1.pokemon_team:
-        pokemon.train_model()
-    print("Treinando modelos para Gary...")
-    for pokemon in trainer2.pokemon_team:
-        pokemon.train_model()
+    print("Treinando modelos para Ash e Gary...")
+    pokemons = trainer1.pokemon_team + trainer2.pokemon_team
+    with ProcessPoolExecutor() as executor:
+        executor.map(train_pokemon_model, pokemons)
 
     # Batalha final após treinamento
     print("Iniciando batalha final após treinamento...")
@@ -80,7 +82,7 @@ def main():
     trainer2.choose_active_pokemon()
 
     # Mostrar a batalha final na interface gráfica
-    battle(trainer1.active_pokemon, trainer2.active_pokemon)
+    # battle(trainer1.active_pokemon, trainer2.active_pokemon)
 
 if __name__ == "__main__":
     main()

@@ -1,7 +1,7 @@
 class BattleRules:
     def __init__(self):
         self.level_cap = 50
-        self.team_size = 1
+        self.team_size = 2
 
     def apply_rules(self, trainer1, trainer2):
         for trainer in [trainer1, trainer2]:
