@@ -1,13 +1,12 @@
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, Input
+from tensorflow.keras.layers import Dense, Input, BatchNormalization, Dropout
 import numpy as np
 import random
 import pokebase as pb
 from collections import deque
 from fetch_functions import fetch_banned_pokemon, fetch_type_chart, fetch_natures, fetch_type_to_int
-from utils import get_random_nature
-from utils import get_stat_multipliers
+from utils import get_random_nature, get_stat_multipliers
 import os
 
 type_chart = fetch_type_chart()
@@ -52,71 +51,72 @@ class Pokemon:
         self.stat_stages = {"attack": 0, "defense": 0, "sp_attack": 0, "sp_defense": 0, "speed": 0}
         self.load_stat_multipliers()
         self.calculate_final_stats()
+        self.on_ground = True
         
 
     def build_model(self, input_dim, output_dim):
         model = Sequential()
-        model.add(Input(shape=(input_dim,), dtype=tf.float32))
-        model.add(Dense(64, activation='relu', dtype=tf.float32))
-        model.add(Dense(64, activation='relu', dtype=tf.float32))
-        model.add(Dense(output_dim, activation='linear', dtype=tf.float32))
-        model.compile(optimizer='adam', loss='mse')
+        model.add(Input(shape=(input_dim,), dtype=tf.float32))  # Input layer
+        model.add(Dense(128, activation='relu', kernel_initializer='he_normal', dtype=tf.float32))  # Increased layer size
+        model.add(BatchNormalization())  # Batch normalization to stabilize learning
+        model.add(Dense(128, activation='relu', kernel_initializer='he_normal', dtype=tf.float32))
+        model.add(Dropout(0.3))  # Dropout to prevent overfitting
+        model.add(Dense(64, activation='relu', kernel_initializer='he_normal', dtype=tf.float32))  # Additional hidden layer
+        model.add(Dense(output_dim, activation='linear', dtype=tf.float32))  # Output layer
+        model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=self.learning_rate), loss='mse')
         return model
 
     def train_model(self):
         X, y = self.prepare_data()
+
+        # Verifica se há dados suficientes para treinar
         if X.shape[0] == 0 or y.shape[0] == 0:
             print("Not enough data to train the model.")
             return
 
-        X = X.astype(np.float32)  # Convertendo para float32
-        y = y.astype(np.float32)  # Convertendo para float32
-        dataset = tf.data.Dataset.from_tensor_slices((X, y)).batch(32)
-        
-        try:
-            for epoch in range(100):
-                for batch_X, batch_y in dataset:
-                    loss = self.train_step(batch_X, batch_y)
-                print(f"Epoch {epoch + 1}, Loss: {loss.numpy()}")
-        except tf.errors.OutOfRangeError:
-            print("End of dataset sequence reached during training.")
-            return
+        X = X.astype(np.float32)  # Mantendo float32 para compatibilidade com CPU
+        y = y.astype(np.float32)  # Mantendo float32 para compatibilidade com CPU
+        dataset = tf.data.Dataset.from_tensor_slices((X, y)).batch(32).cache().prefetch(tf.data.AUTOTUNE)
+
+        early_stopping = tf.keras.callbacks.EarlyStopping(monitor='loss', patience=10, restore_best_weights=True)
+        reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='loss', factor=0.2, patience=5)
+
+        for epoch in range(100):
+            for batch_X, batch_y in dataset:
+                loss = self.train_step(batch_X, batch_y)
+            print(f"Epoch {epoch + 1}, Loss: {loss.numpy()}")
 
         self.save_model(f'{Pokemon.filepath}/{self.name}_model')
 
 
     def prepare_data(self):
-        X = []
-        y = []
+        states = []
+        targets = []
         for state, move, reward, next_state in self.memory:
-            state_list = list(state)
-            next_state_list = list(next_state)
-            target = reward + self.gamma * np.amax(self.model.predict(np.array(next_state_list).reshape(1, -1), verbose=0)[0])
-            move_index = self.moveset.index(move)
-            target_f = self.model.predict(np.array(state_list).reshape(1, -1), verbose=0)
-            target_f[0][move_index] = target
-            X.append(state_list)
-            y.append(target_f[0])
+            state_array = np.array(state).reshape(1, -1)
+            next_state_array = np.array(next_state).reshape(1, -1)
 
-        if len(X) < 32:
-            print(f"Dataset has only {len(X)} samples, which might be insufficient for training.")
-        
-        X = np.array(X)
-        y = np.array(y)
-        return X, y
+            target = reward + self.gamma * np.amax(self.model.predict(next_state_array, verbose=0))
+            move_index = self.moveset.index(move)
+
+            target_f = self.model.predict(state_array, verbose=0)
+            target_f[0][move_index] = target
+
+            states.append(state_array)
+            targets.append(target_f)
+
+        states = np.vstack(states).astype(np.float32)  # Mantendo float32 para melhor compatibilidade com CPU
+        targets = np.vstack(targets).astype(np.float32)
+        return states, targets
 
     @tf.function(input_signature=[tf.TensorSpec(shape=[None, 6], dtype=tf.float32), tf.TensorSpec(shape=[None, None], dtype=tf.float32)], reduce_retracing=True)
     def train_step(self, X, y):
-        try:
-            with tf.GradientTape() as tape:
-                predictions = self.model(X, training=True)
-                loss = tf.keras.losses.MeanSquaredError()(y, predictions)
-            gradients = tape.gradient(loss, self.model.trainable_variables)
-            self.model.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
-            return loss
-        except tf.errors.OutOfRangeError:
-            print("End of sequence during train_step.")
-            return None
+        with tf.GradientTape() as tape:
+            predictions = self.model(X, training=True)
+            loss = tf.keras.losses.MeanSquaredError()(y, predictions)
+        gradients = tape.gradient(loss, self.model.trainable_variables)
+        self.model.optimizer.apply_gradients(zip(gradients, self.model.trainable_variables))
+        return loss
 
     def save_model(self, filepath=None):
         """Save the model's weights and architecture separately."""
@@ -229,6 +229,28 @@ class Pokemon:
 
     def calculate_stat(self, base, iv, evs, level):
         return ((((2 * base + iv + (evs // 4)) * level) // 100) + 5)
+    
+    def get_qs(self, state):
+        state = np.array(state).reshape(1, -1).astype(np.float32)
+        return self.model.predict(state, verbose=0)
+
+    def get_move(self, state):
+        if np.random.rand() <= self.epsilon:
+            return random.choice(self.moveset)
+        q_values = self.get_qs(state)
+        return self.moveset[np.argmax(q_values)]
+
+    def remember(self, state, move, reward, next_state):
+        self.memory.append((state, move, reward, next_state))
+
+    def update_epsilon(self):
+        if self.epsilon > self.epsilon_min:
+            self.epsilon *= self.epsilon_decay
+
+    def update_stat_stage(self, stat_name, change):
+        current_stage = self.stat_stages.get(stat_name, 0)
+        new_stage = max(-6, min(6, current_stage + change))
+        self.stat_stages[stat_name] = new_stage
 
     def calculate_hp_stat(self, base, iv, evs, level):
         return ((((2 * base + iv + (evs // 4)) * level) // 100) + level + 10)
@@ -266,6 +288,23 @@ class Pokemon:
                 effectiveness *= 0
         return effectiveness
 
+    def wake_up(self):
+        print(f"{self.name} acordou devido ao Electric Terrain!")
+
+    def increase_stat(self, stat_name, stages):
+        # Implementação que aumenta o estágio de um stat específico
+        print(f"{self.name} teve seu {stat_name} aumentado em {stages} estágio(s)!")
+
+    def prevent_status_conditions(self):
+        print(f"{self.name} está protegido contra condições de status sob Misty Terrain!")
+
+    def prevent_priority_moves(self):
+        print(f"{self.name} não pode ser afetado por movimentos prioritários sob Psychic Terrain!")
+
+    def consume_item(self):
+        print(f"{self.name} consumiu {self.holding_item}!")
+        self.holding_item = None  # O item é consumido e removido
+    
     def is_banned(self):
         return self.name in Pokemon.banned_pokemon
 
@@ -329,7 +368,11 @@ class Pokemon:
         self.show_move_info(self.selected_move)
         self.confirm_attack(opponent)
 
-    def use_move(self, opponent):
+    def use_move(self, opponent, terrain=None):
+    # Verifique se terrain foi passado e aplique efeitos, se necessário
+        if terrain:
+            terrain.apply_effects(self)
+
         if self.selected_move:
             move_info = self.get_move_info(self.selected_move)
             if move_info:
