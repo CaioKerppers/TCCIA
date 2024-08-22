@@ -368,11 +368,34 @@ class Pokemon:
         self.show_move_info(self.selected_move)
         self.confirm_attack(opponent)
 
-    def use_move(self, opponent, terrain=None):
-    # Verifique se terrain foi passado e aplique efeitos, se necessário
+    def use_move(self, opponent, terrain=None, weather=None):
+        """Execute o movimento selecionado contra o oponente, considerando terreno e clima."""
+        
+        # Verifica se o movimento ativa um tipo de clima
+        if self.selected_move in ["Sunny Day", "Rain Dance", "Hail", "Sandstorm"]:
+            weather_type = {
+                "Sunny Day": "Sunshine",
+                "Rain Dance": "Rain",
+                "Hail": "Hail",
+                "Sandstorm": "Sandstorm"
+            }.get(self.selected_move)
+            if weather:
+                weather.activate_weather(weather_type)
+        
+        # Verifica se o movimento ativa um tipo de terreno
+        if self.selected_move in ["Electric Terrain", "Grassy Terrain", "Misty Terrain", "Psychic Terrain"]:
+            terrain_type = self.selected_move  # O nome do movimento coincide com o tipo do terreno
+            if terrain:
+                terrain.activate_terrain(terrain_type)
+        
+        # Agora aplica os efeitos de terreno e clima se estiverem ativos
         if terrain:
             terrain.apply_effects(self)
+            
+        if weather:
+            weather.apply_effects(self)
 
+        # Executa o movimento
         if self.selected_move:
             move_info = self.get_move_info(self.selected_move)
             if move_info:

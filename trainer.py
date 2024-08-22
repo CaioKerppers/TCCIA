@@ -34,25 +34,27 @@ class Trainer:
         else:
             print(f"{self.name} has no available Pokémon.")
 
-    def battle_turn(self, opponent_trainer):
-        print(f"{self.name}'s turn.")
-        if self.name == "Gary":
-            self.active_pokemon.select_move_automatically(opponent_trainer.active_pokemon)
-        else:
-            self.active_pokemon.select_move(opponent_trainer.active_pokemon)
+    def battle_turn(self, opponent_trainer, weather=None):
+        """Realiza um turno de batalha, considerando os efeitos de clima e terreno."""
+        if weather and weather.is_active():
+            weather.apply_effects(self.active_pokemon)
+
+        # Lógica de seleção e execução de movimentos
+        self.active_pokemon.select_move(opponent_trainer.active_pokemon)
+        self.active_pokemon.use_move(opponent_trainer.active_pokemon, weather=weather)
+
+        # Verifique se o Pokémon oponente desmaiou
+        if opponent_trainer.active_pokemon.hp <= 0:
+            print(f"{opponent_trainer.active_pokemon.name} desmaiou!")
 
     def handle_fainted_pokemon(self):
-        print(f"{self.active_pokemon.name} fainted!")
+        print(f"{self.active_pokemon.name} desmaiou!")
         if not any(pokemon.hp > 0 for pokemon in self.pokemon_team):
-            print(f"{self.name} has no available Pokémon.")
+            print(f"{self.name} não tem mais Pokémon disponíveis.")
             return False
-
-        if self.choose_active_pokemon():
-            print(f"{self.name} automatically chose {self.active_pokemon.name} as the new active Pokémon.")
-            return True
         else:
-            print(f"{self.name} has no available Pokémon.")
-            return False
+            self.choose_active_pokemon()
+            return True
 
     def all_pokemons_fainted(self):
         return all(pokemon.hp == 0 for pokemon in self.pokemon_team)
