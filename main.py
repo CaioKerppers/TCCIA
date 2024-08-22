@@ -2,15 +2,16 @@ from concurrent.futures import ProcessPoolExecutor
 from battleRules import BattleRules
 from trainer import Trainer
 from data_fetching import select_team
+from weather import Weather  # Importe a classe Weather
 
 def train_pokemon_model(pokemon):
     pokemon.train_model()
-
 
 def main():
     print("Iniciando simulação de batalha...")
 
     battle_rules = BattleRules()
+    weather = Weather()  # Inicializa a classe Weather
 
     # Criar treinadores
     trainer1 = Trainer("Ash")
@@ -44,9 +45,12 @@ def main():
         trainer1.choose_active_pokemon()
         trainer2.choose_active_pokemon()
 
+        # Definir clima aleatório para cada batalha
+        weather.activate_weather("Sunshine")  # Exemplo de ativação de clima
+
         while True:
             print(f"{trainer1.name} está atacando...")
-            trainer1.battle_turn(trainer2)
+            trainer1.battle_turn(trainer2, weather)
             if trainer2.active_pokemon.hp <= 0:
                 if not trainer2.handle_fainted_pokemon():
                     print(f"{trainer1.name} wins!")
@@ -56,7 +60,7 @@ def main():
                 break
 
             print(f"{trainer2.name} está atacando...")
-            trainer2.battle_turn(trainer1)
+            trainer2.battle_turn(trainer1, weather)
             if trainer1.active_pokemon.hp <= 0:
                 if not trainer1.handle_fainted_pokemon():
                     print(f"{trainer2.name} wins!")
@@ -64,6 +68,9 @@ def main():
             if trainer1.all_pokemons_fainted():
                 print(f"{trainer2.name} wins! Todos os Pokémon de {trainer1.name} estão desmaiados.")
                 break
+
+        # Reduzir a duração do clima após cada turno
+        weather.decrement_turn()
 
     # Treinar modelos para ambos os treinadores após coleta de dados
     print("Treinando modelos para Ash e Gary...")
