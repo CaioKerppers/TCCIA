@@ -6,6 +6,7 @@ import random
 import pokebase as pb
 from collections import deque
 from fetch_functions import fetch_banned_pokemon, fetch_type_chart, fetch_natures, fetch_type_to_int
+from move import Move
 from utils import get_random_nature, get_stat_multipliers
 import os
 
@@ -39,12 +40,12 @@ class Pokemon:
         self.level = level  # Set default level to 50
         self.ivs = ivs if ivs else self.generate_random_ivs()
         self.evs = evs if evs else self.generate_random_evs()
-        self.memory = deque(maxlen=2000)
-        self.gamma = 0.95  # discount rate
+        self.memory = deque(maxlen=4000)
+        self.gamma = 0.41  # discount rate
         self.epsilon = 1.0  # exploration rate
-        self.epsilon_min = 0.01
-        self.epsilon_decay = 0.995
-        self.learning_rate = 0.001
+        self.epsilon_min = 0.025
+        self.epsilon_decay = 0.600
+        self.learning_rate = 0.700
         self.model = self.build_model(input_dim=6, output_dim=len(moveset))
         self.status = {}  # Adiciona o atributo de status
         self.guts_ability = False
@@ -52,17 +53,53 @@ class Pokemon:
         self.load_stat_multipliers()
         self.calculate_final_stats()
         self.on_ground = True
+        self.protected = False
         
 
-    def build_model(self, input_dim, output_dim):
+    def build_model(self, input_dim, output_dim, neurons=512):
         model = Sequential()
         model.add(Input(shape=(input_dim,), dtype=tf.float32))  # Input layer
-        model.add(Dense(128, activation='relu', kernel_initializer='he_normal', dtype=tf.float32))  # Increased layer size
-        model.add(BatchNormalization())  # Batch normalization to stabilize learning
-        model.add(Dense(128, activation='relu', kernel_initializer='he_normal', dtype=tf.float32))
-        model.add(Dropout(0.3))  # Dropout to prevent overfitting
-        model.add(Dense(64, activation='relu', kernel_initializer='he_normal', dtype=tf.float32))  # Additional hidden layer
-        model.add(Dense(output_dim, activation='linear', dtype=tf.float32))  # Output layer
+
+        #camada 1
+        model.add(Dense(neurons, activation='relu', kernel_initializer='he_normal', dtype=tf.float32))
+        model.add(BatchNormalization())
+        model.add(Dropout(0.4))  # Dropout to prevent overfitting
+        
+        #camada 2
+        model.add(Dense(neurons, activation='relu', kernel_initializer='he_normal', dtype=tf.float32))
+        model.add(BatchNormalization())
+        model.add(Dropout(0.4))  # Dropout to prevent overfitting
+        
+        #camada 3
+        model.add(Dense(neurons, activation='relu', kernel_initializer='he_normal', dtype=tf.float32))
+        model.add(BatchNormalization())
+        model.add(Dropout(0.4))  # Dropout to prevent overfitting
+        
+        #camada 5
+        model.add(Dense(neurons, activation='relu', kernel_initializer='he_normal', dtype=tf.float32))
+        model.add(BatchNormalization())
+        model.add(Dropout(0.4))  # Dropout to prevent overfitting
+        
+        #camada 6
+        model.add(Dense(neurons, activation='relu', kernel_initializer='he_normal', dtype=tf.float32))
+        model.add(BatchNormalization())
+        model.add(Dropout(0.4))  # Dropout to prevent overfitting
+        
+        #camada 7
+        model.add(Dense(neurons, activation='relu', kernel_initializer='he_normal', dtype=tf.float32))
+        model.add(BatchNormalization())
+        model.add(Dropout(0.4))  # Dropout to prevent overfitting
+        
+        #camada 8
+        model.add(Dense(neurons, activation='relu', kernel_initializer='he_normal', dtype=tf.float32))
+        model.add(BatchNormalization())
+        model.add(Dropout(0.4))  # Dropout to prevent overfitting
+
+        # Additional hidden layer with the same number of neurons
+        model.add(Dense(neurons, activation='relu', kernel_initializer='he_normal', dtype=tf.float32))
+
+        # Output layer
+        model.add(Dense(output_dim, activation='linear', dtype=tf.float32))
         model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=self.learning_rate), loss='mse')
         return model
 
@@ -81,7 +118,7 @@ class Pokemon:
         early_stopping = tf.keras.callbacks.EarlyStopping(monitor='loss', patience=10, restore_best_weights=True)
         reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='loss', factor=0.2, patience=5)
 
-        for epoch in range(100):
+        for epoch in range(50):
             for batch_X, batch_y in dataset:
                 loss = self.train_step(batch_X, batch_y)
             print(f"Epoch {epoch + 1}, Loss: {loss.numpy()}")
@@ -369,87 +406,61 @@ class Pokemon:
         self.confirm_attack(opponent)
 
     def use_move(self, opponent, terrain=None, weather=None):
-        """Execute o movimento selecionado contra o oponente, considerando terreno e clima."""
-        
-        # Verifica se o movimento ativa um tipo de clima
-        if self.selected_move in ["Sunny Day", "Rain Dance", "Hail", "Sandstorm"]:
-            weather_type = {
-                "Sunny Day": "Sunshine",
-                "Rain Dance": "Rain",
-                "Hail": "Hail",
-                "Sandstorm": "Sandstorm"
-            }.get(self.selected_move)
-            if weather:
-                weather.activate_weather(weather_type)
-        
-        # Verifica se o movimento ativa um tipo de terreno
-        if self.selected_move in ["Electric Terrain", "Grassy Terrain", "Misty Terrain", "Psychic Terrain"]:
-            terrain_type = self.selected_move  # O nome do movimento coincide com o tipo do terreno
-            if terrain:
-                terrain.activate_terrain(terrain_type)
-        
-        # Agora aplica os efeitos de terreno e clima se estiverem ativos
+        """Execute the selected move against the opponent, considering terrain and weather."""
+        if not self.selected_move:  # Ensure a move is selected
+            return
+
+        # Apply terrain and weather effects before using the move
         if terrain:
             terrain.apply_effects(self)
             
         if weather:
             weather.apply_effects(self)
 
-        # Executa o movimento
-        if self.selected_move:
-            move_info = self.get_move_info(self.selected_move)
-            if move_info:
-                move_name, move_type, move_power, move_accuracy, damage_class, status_effects = move_info
-                print(f"{self.name} used {self.selected_move}!")
-                print(f"Move info: Name={move_name}, Type={move_type}, Power={move_power}, Accuracy={move_accuracy}, Class={damage_class}")
+        move = Move(self.selected_move)
+        
+        # Check for protection status
+        if self.protected:
+            print(f"{self.name} is protected by Protect! The attack fails.")
+            self.protected = False  # Reset protection after use
+            return
 
-                if self.resolve_status():
-                    if move_power:  # Verifica se há poder (dano) para o movimento
-                        damage = self.calculate_damage(self, opponent, move_info)
-                        print(f"Damage calculated: {damage:.2f}")
-                        opponent.hp -= damage
-                        if opponent.hp < 0:
-                            opponent.hp = 0
-                        print(f"{opponent.name}'s HP dropped to {opponent.hp}")
-                        self.update_memory(opponent, damage)
-                    else:
-                        print("Move has no power (might be a status move).")
-                    for status in status_effects:
-                        self.apply_status_effect(opponent, status)
+        move_info = self.get_move_info(self.selected_move)
+        if move_info:
+            move_name, move_type, move_power, move_accuracy, damage_class, status_effects = move_info
+            print(f"{self.name} used {self.selected_move}!")
+            print(f"Move info: Name={move_name}, Type={move_type}, Power={move_power}, Accuracy={move_accuracy}, Class={damage_class}")
+
+            if self.resolve_status():  # Check if Pokémon can move based on status conditions
+                if move_power:  # Check if the move has power (deals damage)
+                    damage = Move.calculate_damage(self, opponent, move_info)
+                    print(f"Damage calculated: {damage:.2f}")
+                    opponent.hp -= damage
+                    opponent.hp = max(opponent.hp, 0)  # Ensure HP doesn't go below 0
+                    print(f"{opponent.name}'s HP dropped to {opponent.hp}")
+                    self.update_memory(opponent, damage)
                 else:
-                    print(f"{self.name} não pode atacar devido ao status {self.status}.")
-            else:
-                print(f"Could not retrieve move info for {self.selected_move}")
-        else:
-            print("No move selected.")
+                    print("Move has no power (might be a status move).")
 
-    @staticmethod
-    def calculate_damage(attacker, defender, move_info):
-        level = attacker.level
-        move_power = move_info[2] if move_info[2] else 0
-        damage_class = move_info[4].lower()
-        if damage_class == "physical":
-            attack_stat = attacker.attack
-            defense_stat = defender.defense
-        elif damage_class == "special":
-            attack_stat = attacker.sp_attack
-            defense_stat = defender.sp_defense
+                # Apply any status effects from the move
+                for status in status_effects:
+                    self.apply_status_effect(opponent, status)
+            else:
+                print(f"{self.name} is unable to attack due to status {self.status}.")
         else:
-            return 0
-        damage = (((2 * level / 5 + 2) * move_power * (attack_stat / defense_stat)) / 50) + 2
-        if move_info[1].capitalize() in [attacker.type1, attacker.type2]:
-            damage *= 1.5
-        defender_types = [defender.type1, defender.type2] if defender.type2 else [defender.type1]
-        type_effectiveness = Pokemon.get_type_effectiveness(move_info[1].capitalize(), defender_types)
-        damage *= type_effectiveness
-        is_critical = random.random() < 0.0625
-        critical = 1.5 if is_critical else 1.0
-        damage *= critical
-        damage *= random.uniform(0.85, 1.0)
-        return damage
+            print(f"Could not retrieve move info for {self.selected_move}")
+
+        # Clear the selected move after execution
+        self.selected_move = None
 
     def confirm_attack(self, opponent):
+        if not self.selected_move:  # Check if a move has been selected
+            print("No move selected.")
+            return
+        
+        # Ensure the move is only used once per turn
         self.use_move(opponent)
+        self.selected_move = None
 
     def get_move_info(self, move):
         try:
@@ -534,9 +545,12 @@ class Pokemon:
         self.memory.append((state, self.selected_move, reward, next_state))
     
     def apply_status_effect(self, opponent, status):
+        """Applies a status effect to the opponent if not already afflicted."""
         if status not in opponent.status:
-            opponent.status[status] = 0
-            print(f"{opponent.name} foi afetado por {status}!")
+            opponent.status[status] = 0  # Initial status counter (can be incremented if needed)
+            print(f"{opponent.name} was affected by {status}!")
+        else:
+            print(f"{opponent.name} is already affected by {status}.")
 
     def resolve_status(self):
         if not self.status:

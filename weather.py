@@ -45,48 +45,48 @@ class Weather:
             pokemon.attack *= 1.5
         if pokemon.type1 == "Water" or pokemon.type2 == "Water":
             pokemon.attack *= 0.5
-        if pokemon.ability == "Chlorophyll":
-            pokemon.speed *= 2
-        if pokemon.ability == "Solar Power":
-            pokemon.sp_attack *= 1.5
-            pokemon.hp -= pokemon.max_hp * 0.1  # Reduz o HP a cada turno
+        #if pokemon.ability == "Chlorophyll":
+        #    pokemon.speed *= 2
+       # if pokemon.ability == "Solar Power":
+        #    pokemon.sp_attack *= 1.5
+        #    pokemon.hp -= pokemon.max_hp * 0.1  # Reduz o HP a cada turno
 
     def _apply_harsh_sunshine_effects(self, pokemon):
         if pokemon.type1 == "Fire" or pokemon.type2 == "Fire":
             pokemon.attack *= 1.5
         if pokemon.type1 == "Water" or pokemon.type2 == "Water":
             pokemon.attack = 0  # Movimentos de água não funcionam
-        if pokemon.ability == "Chlorophyll":
-            pokemon.speed *= 2
-        if pokemon.ability == "Solar Power":
-            pokemon.sp_attack *= 1.5
-            pokemon.hp -= pokemon.max_hp * 0.1  # Reduz o HP a cada turno
+        #if pokemon.ability == "Chlorophyll":
+        #    pokemon.speed *= 2
+        #if pokemon.ability == "Solar Power":
+        #    pokemon.sp_attack *= 1.5
+        #    pokemon.hp -= pokemon.max_hp * 0.1  # Reduz o HP a cada turno
 
     def _apply_rain_effects(self, pokemon):
         if pokemon.type1 == "Water" or pokemon.type2 == "Water":
             pokemon.attack *= 1.5
         if pokemon.type1 == "Fire" or pokemon.type2 == "Fire":
             pokemon.attack *= 0.5
-        if pokemon.ability == "Swift Swim":
-            pokemon.speed *= 2
-        if pokemon.ability == "Dry Skin":
-            pokemon.hp += pokemon.max_hp * 0.125  # Recupera 1/8 do HP por turno
+       # if pokemon.ability == "Swift Swim":
+        #    pokemon.speed *= 2
+       # if pokemon.ability == "Dry Skin":
+        #    pokemon.hp += pokemon.max_hp * 0.125  # Recupera 1/8 do HP por turno
 
     def _apply_heavy_rain_effects(self, pokemon):
         if pokemon.type1 == "Water" or pokemon.type2 == "Water":
             pokemon.attack *= 1.5
         if pokemon.type1 == "Fire" or pokemon.type2 == "Fire":
             pokemon.attack = 0  # Movimentos de fogo não funcionam
-        if pokemon.ability == "Swift Swim":
-            pokemon.speed *= 2
-        if pokemon.ability == "Dry Skin":
-            pokemon.hp += pokemon.max_hp * 0.125  # Recupera 1/8 do HP por turno
+        #if pokemon.ability == "Swift Swim":
+        #    pokemon.speed *= 2
+      #  if pokemon.ability == "Dry Skin":
+       #     pokemon.hp += pokemon.max_hp * 0.125  # Recupera 1/8 do HP por turno
 
     def _apply_hail_effects(self, pokemon):
         if pokemon.type1 != "Ice" and pokemon.type2 != "Ice":
             pokemon.hp -= pokemon.max_hp * 0.0625  # 1/16 do HP perdido a cada turno
-        if pokemon.ability == "Snow Cloak":
-            pokemon.evasion *= 1.2
+       # if pokemon.ability == "Snow Cloak":
+        #    pokemon.evasion *= 1.2
 
     def _apply_snow_effects(self, pokemon):
         if pokemon.type1 == "Ice" or pokemon.type2 == "Ice":
@@ -102,6 +102,7 @@ class Weather:
         if "Flying" in [pokemon.type1, pokemon.type2]:
             print(f"{pokemon.name} está protegido por Strong Winds!")
             # Lógica para reduzir o dano de movimentos super efetivos contra Flying
+
             
             def modify_damage(damage, move_type):
                 effectiveness = pokemon.get_type_effectiveness(move_type, ["Flying"])
