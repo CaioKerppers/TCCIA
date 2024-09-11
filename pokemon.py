@@ -56,44 +56,44 @@ class Pokemon:
         self.protected = False
         
 
-    def build_model(self, input_dim, output_dim, neurons=512):
+    def build_model(self, input_dim, output_dim, neurons=128):
         model = Sequential()
         model.add(Input(shape=(input_dim,), dtype=tf.float32))  # Input layer
 
         #camada 1
         model.add(Dense(neurons, activation='relu', kernel_initializer='he_normal', dtype=tf.float32))
         model.add(BatchNormalization())
-        model.add(Dropout(0.4))  # Dropout to prevent overfitting
+        model.add(Dropout(0.2))  # Dropout to prevent overfitting
         
         #camada 2
         model.add(Dense(neurons, activation='relu', kernel_initializer='he_normal', dtype=tf.float32))
         model.add(BatchNormalization())
-        model.add(Dropout(0.4))  # Dropout to prevent overfitting
+        model.add(Dropout(0.2))  # Dropout to prevent overfitting
         
         #camada 3
         model.add(Dense(neurons, activation='relu', kernel_initializer='he_normal', dtype=tf.float32))
         model.add(BatchNormalization())
-        model.add(Dropout(0.4))  # Dropout to prevent overfitting
+        model.add(Dropout(0.2))  # Dropout to prevent overfitting
         
         #camada 5
         model.add(Dense(neurons, activation='relu', kernel_initializer='he_normal', dtype=tf.float32))
         model.add(BatchNormalization())
-        model.add(Dropout(0.4))  # Dropout to prevent overfitting
+        model.add(Dropout(0.2))  # Dropout to prevent overfitting
         
         #camada 6
         model.add(Dense(neurons, activation='relu', kernel_initializer='he_normal', dtype=tf.float32))
         model.add(BatchNormalization())
-        model.add(Dropout(0.4))  # Dropout to prevent overfitting
+        model.add(Dropout(0.2))  # Dropout to prevent overfitting
         
         #camada 7
         model.add(Dense(neurons, activation='relu', kernel_initializer='he_normal', dtype=tf.float32))
         model.add(BatchNormalization())
-        model.add(Dropout(0.4))  # Dropout to prevent overfitting
+        model.add(Dropout(0.2))  # Dropout to prevent overfitting
         
         #camada 8
         model.add(Dense(neurons, activation='relu', kernel_initializer='he_normal', dtype=tf.float32))
         model.add(BatchNormalization())
-        model.add(Dropout(0.4))  # Dropout to prevent overfitting
+        model.add(Dropout(0.2))  # Dropout to prevent overfitting
 
         # Additional hidden layer with the same number of neurons
         model.add(Dense(neurons, activation='relu', kernel_initializer='he_normal', dtype=tf.float32))

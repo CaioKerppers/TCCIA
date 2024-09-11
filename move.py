@@ -162,7 +162,7 @@ class Move:
                         defender.status[ailment_name] = 1
                         print(f"{defender.name} foi afetado por {ailment_name}!")
                     else:
-                        print(f"{defender.name} já está sob o efeito de {ailment_name}.")
+                            print(f"{defender.name} já está sob o efeito de {ailment_name}.")
 
             # Protect effect
             elif effect == "protect":
@@ -235,7 +235,7 @@ class Move:
                 weather_type = effect.split("-")[0].capitalize()
                 if weather:
                     weather.activate_weather(weather_type)
-                print(f"{weather_type} started!")
+                    print(f"{weather_type} started!")
 
             # Terrain effects
             elif effect.endswith("-terrain"):
@@ -250,7 +250,7 @@ class Move:
 
             # Grant immunity
             elif effect == "grant-immunity":
-                print(f"{attacker.name} is now immune to status conditions!")
+                    print(f"{attacker.name} is now immune to status conditions!")
 
             # Stat swap effects
             elif effect == "swap-attack-defense":
