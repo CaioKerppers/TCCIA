@@ -31,8 +31,6 @@ def select_random_pokemon(num_pokemon, battle_rules):
             print(f"Pokémon ID {pokemon_id} não é válido ou não pôde ser recuperado.")
     return selected_pokemon
 
-
-
 def select_team(trainer, battle_rules):
     print(f"{trainer.name}, o seu time de Pokémon será selecionado aleatoriamente.")
     random_pokemon = []

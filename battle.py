@@ -49,10 +49,10 @@ class Battle:
     def check_winner(self):
         """Verifica se algum treinador venceu a batalha."""
         if self.trainer2.all_pokemons_fainted():
-            #print(f"{self.trainer1.name} wins! Todos os Pokémon de {self.trainer2.name} estão desmaiados.")
+            print(f"{self.trainer1.name} wins! Todos os Pokémon de {self.trainer2.name} estão desmaiados.")
             return self.trainer1
         elif self.trainer1.all_pokemons_fainted():
-            #print(f"{self.trainer2.name} wins! Todos os Pokémon de {self.trainer1.name} estão desmaiados.")
+            print(f"{self.trainer2.name} wins! Todos os Pokémon de {self.trainer1.name} estão desmaiados.")
             return self.trainer2
         return None
 
@@ -61,7 +61,7 @@ class Battle:
         self.apply_battle_rules()
 
         for battle_num in range(num_battles):
-            #print(f"Iniciando batalha {battle_num + 1}/{num_battles}...")
+            print(f"Iniciando batalha {battle_num + 1}/{num_battles}...")
 
             # Resetar times antes de cada batalha
             self.reset_teams()
@@ -76,5 +76,5 @@ class Battle:
                 if winner:
                     break
 
-        print(f"Batalha concluída. O vencedor é {winner.name}!")
+#         print(f"Batalha concluída. O vencedor é {winner.name}!")
         return winner

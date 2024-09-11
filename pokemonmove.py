@@ -866,5 +866,5 @@ moves = [
 
 # Imprimindo todos os movimentos
 for move in moves:
-    print(move)
+#     print(move)
 	
