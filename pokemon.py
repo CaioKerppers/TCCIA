@@ -15,8 +15,26 @@ banned_pokemon = fetch_banned_pokemon()
 natures = fetch_natures()
 type_to_int = fetch_type_to_int()
 
+
+# Limpar sessão anterior
+tf.keras.backend.clear_session()
+
+# Verificação da GPU e inicialização correta
+gpus = tf.config.list_physical_devices('GPU')
+if gpus:
+    try:
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+        logical_gpus = tf.config.experimental.list_logical_devices('GPU')
+        print(f"{len(gpus)} GPUs físicas, {len(logical_gpus)} GPUs lógicas")
+    except RuntimeError as e:
+        print(f"Erro na inicialização da GPU: {e}")
+else:
+    print("Nenhuma GPU encontrada. Usando CPU.")
+
 class Pokemon:
-    filepath = r'C:/Users/rosan/Videos/3º/TCCv2.1/models/larvesta_model'
+    #filepath = r'C:\Users\User\Documents\PI-III\models\larvesta_model'
+    filepath = '/mnt/c/Users/User/Documents/PI-III'
     
     banned_pokemon = banned_pokemon
 
@@ -75,6 +93,11 @@ class Pokemon:
         model.add(BatchNormalization())
         model.add(Dropout(0.2))  # Dropout to prevent overfitting
         
+        #camada 4
+        model.add(Dense(neurons, activation='relu', kernel_initializer='he_normal', dtype=tf.float32))
+        model.add(BatchNormalization())
+        model.add(Dropout(0.2))  # Dropout to prevent overfitting
+        
         #camada 5
         model.add(Dense(neurons, activation='relu', kernel_initializer='he_normal', dtype=tf.float32))
         model.add(BatchNormalization())
@@ -89,7 +112,7 @@ class Pokemon:
         model.add(Dense(neurons, activation='relu', kernel_initializer='he_normal', dtype=tf.float32))
         model.add(BatchNormalization())
         model.add(Dropout(0.2))  # Dropout to prevent overfitting
-        
+
         #camada 8
         model.add(Dense(neurons, activation='relu', kernel_initializer='he_normal', dtype=tf.float32))
         model.add(BatchNormalization())
@@ -104,34 +127,40 @@ class Pokemon:
         return model
 
     def train_model(self):
+        # Preparar os dados (X e y) para treinamento
         X, y = self.prepare_data()
 
-        # Verifica se há dados suficientes para treinar
+        # Certifique-se de que há dados suficientes para treinar
         if X.shape[0] == 0 or y.shape[0] == 0:
-            print("Not enough data to train the model.")
+            print("Não há dados suficientes para treinar o modelo.")
             return
 
-        X = X.astype(np.float32)  # Mantendo float32 para compatibilidade com CPU
-        y = y.astype(np.float32)  # Mantendo float32 para compatibilidade com CPU
+        # Configurar dataset para o treinamento
         dataset = tf.data.Dataset.from_tensor_slices((X, y)).batch(32).cache().prefetch(tf.data.AUTOTUNE)
 
+        # Callbacks para o ajuste do treinamento
         early_stopping = tf.keras.callbacks.EarlyStopping(monitor='loss', patience=10, restore_best_weights=True)
         reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(monitor='loss', factor=0.2, patience=5)
 
-        for epoch in range(50):
-            for batch_X, batch_y in dataset:
-                loss = self.train_step(batch_X, batch_y)
-            print(f"Epoch {epoch + 1}, Loss: {loss.numpy()}")
+        # Verificar se há GPUs e configurar para usar
+        with tf.device('/GPU:0' if tf.config.list_physical_devices('GPU') else '/CPU:0'):
+            # Treinamento do modelo com os dados
+            self.model.fit(
+                dataset, 
+                epochs=50,  # Número de épocas
+                callbacks=[early_stopping, reduce_lr],  # Callbacks para parar o treinamento
+                verbose=1  # Mostra a barra de progresso do treinamento
+            )
 
+        # Salvar o modelo após o treinamento
         self.save_model(f'{Pokemon.filepath}/{self.name}_model')
-
 
     def prepare_data(self):
         states = []
         targets = []
         for state, move, reward, next_state in self.memory:
-            state_array = np.array(state).reshape(1, -1)
-            next_state_array = np.array(next_state).reshape(1, -1)
+            state_array = np.array(state).reshape(1, -1).astype(np.float32)  # Garante float32
+            next_state_array = np.array(next_state).reshape(1, -1).astype(np.float32)  # Garante float32
 
             target = reward + self.gamma * np.amax(self.model.predict(next_state_array, verbose=0))
             move_index = self.moveset.index(move)
@@ -142,9 +171,11 @@ class Pokemon:
             states.append(state_array)
             targets.append(target_f)
 
-        states = np.vstack(states).astype(np.float32)  # Mantendo float32 para melhor compatibilidade com CPU
+        # Formatar corretamente as matrizes de entrada e saída
+        states = np.vstack(states).astype(np.float32)
         targets = np.vstack(targets).astype(np.float32)
         return states, targets
+
 
     @tf.function(input_signature=[tf.TensorSpec(shape=[None, 6], dtype=tf.float32), tf.TensorSpec(shape=[None, None], dtype=tf.float32)], reduce_retracing=True)
     def train_step(self, X, y):
@@ -167,6 +198,8 @@ class Pokemon:
             
             # Save weights
             weights_filepath = os.path.join(directory, base_name + '.weights.h5')
+            print("balacobaco")
+            print(weights_filepath)
             if not weights_filepath.endswith('.h5'):
                 raise ValueError("The filename must end in `.h5`.")
             self.model.save_weights(weights_filepath)
@@ -407,18 +440,22 @@ class Pokemon:
 
     def use_move(self, opponent, terrain=None, weather=None):
         """Execute the selected move against the opponent, considering terrain and weather."""
+        if self.hp <= 0:  # Prevent fainted Pokémon from using a move
+            print(f"{self.name} is fainted and cannot move!")
+            return
+
         if not self.selected_move:  # Ensure a move is selected
             return
 
         # Apply terrain and weather effects before using the move
         if terrain:
             terrain.apply_effects(self)
-            
+
         if weather:
             weather.apply_effects(self)
 
         move = Move(self.selected_move)
-        
+
         # Check for protection status
         if self.protected:
             print(f"{self.name} is protected by Protect! The attack fails.")

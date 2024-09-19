@@ -1,5 +1,5 @@
 google-cloud-firestore
-tensorflow
+tensorflow[and-cuda]
 pokebase
 numpy
 firebase-admin
