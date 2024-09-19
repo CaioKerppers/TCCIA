@@ -76,5 +76,5 @@ class Battle:
                 if winner:
                     break
 
-#         print(f"Batalha concluída. O vencedor é {winner.name}!")
+        print(f"Batalha concluída. O vencedor é {winner.name}!")
         return winner
